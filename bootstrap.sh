@@ -133,8 +133,8 @@ start_sql_proxy() {
     
     # 4. Wait for Readiness
     echo -n "   Waiting for proxy connection..."
-    for i in {1..15}; do
-        if nc -z 127.0.0.1 5432 2>/dev/null; then
+    for i in {1..30}; do
+        if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
             echo " Connected!"
             return 0
         fi
@@ -646,6 +646,7 @@ update_secrets() {
 
 seed_data() {
     step 13 "Seeding Initial Data (Workspaces, Templates, Assets)"
+    cd "$REPO_ROOT"
 
     info "The user running this script will be set as the owner of initial data."
     local CURRENT_USER=$(gcloud config get-value account 2>/dev/null)
