@@ -19,25 +19,25 @@ import {
   Component,
   ElementRef,
   EventEmitter,
-  NgZone,
-  OnInit,
   Input,
+  NgZone,
   OnDestroy,
+  OnInit,
   Output,
   ViewChild,
 } from '@angular/core';
-import {debounceTime, finalize, fromEvent, Subscription} from 'rxjs';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { debounceTime, finalize, fromEvent, Subscription } from 'rxjs';
+import { AssetTypeEnum } from '../../../admin/source-assets-management/source-asset.model';
+import { handleErrorSnackbar, handleSuccessSnackbar } from '../../../utils/handleMessageSnackbar';
 import {
-  SourceAssetService,
   SourceAssetResponseDto,
   SourceAssetSearchDto,
+  SourceAssetService,
 } from '../../services/source-asset.service';
-import {AssetTypeEnum} from '../../../admin/source-assets-management/source-asset.model';
-import {UserService} from '../../services/user.service';
-import {MatDialog} from '@angular/material/dialog';
-import {MatSnackBar} from '@angular/material/snack-bar';
-import {ConfirmationDialogComponent} from '../confirmation-dialog/confirmation-dialog.component';
-import { handleErrorSnackbar, handleSuccessSnackbar } from '../../../utils/handleMessageSnackbar';
+import { UserService } from '../../services/user.service';
+import { ConfirmationDialogComponent } from '../confirmation-dialog/confirmation-dialog.component';
 
 @Component({
   selector: 'app-source-asset-gallery',
@@ -45,8 +45,7 @@ import { handleErrorSnackbar, handleSuccessSnackbar } from '../../../utils/handl
   styleUrls: ['./source-asset-gallery.component.scss'],
 })
 export class SourceAssetGalleryComponent
-  implements OnInit, OnDestroy, AfterViewInit
-{
+  implements OnInit, OnDestroy, AfterViewInit {
   @Output() assetSelected = new EventEmitter<SourceAssetResponseDto>();
   @Input() filterByType: AssetTypeEnum | null = null;
   @Input() filterByMimeType:
@@ -78,7 +77,7 @@ export class SourceAssetGalleryComponent
     private ngZone: NgZone,
     private dialog: MatDialog,
     private snackBar: MatSnackBar,
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.loadingSubscription = this.sourceAssetService.isLoading$.subscribe(
@@ -191,7 +190,7 @@ export class SourceAssetGalleryComponent
   }
 
   private updateColumns(): void {
-    this.columns = Array.from({length: this.numColumns}, () => []);
+    this.columns = Array.from({ length: this.numColumns }, () => []);
     this.assets.forEach((asset, index) => {
       this.columns[index % this.numColumns].push(asset);
     });
