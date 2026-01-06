@@ -85,11 +85,12 @@ import {MatSlideToggleModule} from '@angular/material/slide-toggle';
 import {MatSliderModule} from '@angular/material/slider';
 import {ImageCropperComponent} from 'ngx-image-cropper';
 import {ImageCropperDialogComponent} from './common/components/image-cropper-dialog/image-cropper-dialog.component';
+import { WorkbenchComponent } from './workbench/workbench.component';
 import {AudioComponent} from './audio/audio.component';
 import {AddVoiceDialogComponent} from './components/add-voice-dialog/add-voice-dialog.component';
 import {MatButtonToggleModule} from '@angular/material/button-toggle';
 import { FlowPromptBoxComponent } from "./common/components/flow-prompt-box/flow-prompt-box.component";
-
+import { CommonModule } from '@angular/common';
 @NgModule({
   declarations: [
     AppComponent,
@@ -108,6 +109,7 @@ import { FlowPromptBoxComponent } from "./common/components/flow-prompt-box/flow
     ImageSelectorComponent,
     SourceAssetGalleryComponent,
     ImageCropperDialogComponent,
+    WorkbenchComponent,
     AudioComponent,
     AddVoiceDialogComponent,
   ],
@@ -145,7 +147,7 @@ import { FlowPromptBoxComponent } from "./common/components/flow-prompt-box/flow
     MatButtonToggleModule,
     MatSliderModule,
     NotificationContainerComponent,
-    FlowPromptBoxComponent
+    FlowPromptBoxComponent,
 ],
   providers: [
     provideClientHydration(),

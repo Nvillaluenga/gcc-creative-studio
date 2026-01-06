@@ -27,6 +27,7 @@ import {MediaDetailComponent} from './gallery/media-detail/media-detail.componen
 import {AdminAuthGuard} from './admin/admin-auth.guard';
 import {VtoComponent} from './vto/vto.component';
 import {AudioComponent} from './audio/audio.component';
+import { WorkbenchComponent } from './workbench/workbench.component';
 
 const routes: Routes = [
   {path: 'login', component: LoginComponent},
@@ -40,6 +41,7 @@ const routes: Routes = [
   {path: 'arena', component: ArenaComponent, canActivate: [AuthGuardService]},
   {path: 'vto', component: VtoComponent, canActivate: [AuthGuardService]},
   {path: 'audio', component: AudioComponent, canActivate: [AuthGuardService]},
+  {path: 'workbench', component:WorkbenchComponent, canActivate: [AuthGuardService]},
   // When a user goes to '/gallery', show the main feed.
   {
     path: 'gallery',
