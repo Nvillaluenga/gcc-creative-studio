@@ -237,6 +237,7 @@ export class WorkflowFormService {
 
     // 1. Patch Main Fields
     this.workflowForm.patchValue({
+      id: 'id' in data ? data.id : '',
       name: data.name,
       description: data.description,
       userInput: {
