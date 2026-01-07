@@ -115,23 +115,7 @@ export class ExecutionHistoryComponent implements OnInit {
         });
     }
 
-    getStatusClass(state: string): string {
-        switch (state) {
-            case 'SUCCEEDED': return '!bg-green-500/20 !text-green-300';
-            case 'FAILED': return '!bg-red-500/20 !text-red-300';
-            case 'ACTIVE': return '!bg-blue-500/20 !text-blue-300';
-            default: return '!bg-gray-500/20 !text-gray-300';
-        }
-    }
 
-    getStatusIcon(state: string): string {
-        switch (state) {
-            case 'SUCCEEDED': return 'check_circle';
-            case 'FAILED': return 'error';
-            case 'ACTIVE': return 'hourglass_top';
-            default: return 'help_outline';
-        }
-    }
 
     runWorkflow(): void {
         if (!this.workflowId || this.isLoading) return;
