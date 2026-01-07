@@ -16,8 +16,11 @@
 
 import { HttpClient } from '@angular/common/http';
 import { Injectable, OnDestroy } from '@angular/core';
-import { BehaviorSubject, Observable, Subscription, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, Subscription, throwError, timer } from 'rxjs';
 import {
+  shareReplay,
+  switchMap,
+  takeWhile,
   tap
 } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
@@ -210,6 +213,27 @@ export class WorkflowService implements OnDestroy {
   getExecutionDetails(workflowId: string, executionId: string): Observable<ExecutionDetails> {
     return this.http.get<ExecutionDetails>(
       `${this.API_BASE_URL}/workflows/${workflowId}/executions/${encodeURIComponent(executionId)}`
+    );
+  }
+
+  /**
+   * Polls execution details until the state is no longer 'ACTIVE'.
+   * @param workflowId The workflow ID
+   * @param executionId The execution ID
+   * @param intervalMs How often to poll (default 5000ms)
+   */
+  pollExecutionDetails(workflowId: string, executionId: string, intervalMs = 5000): Observable<ExecutionDetails> {
+    return timer(0, intervalMs).pipe(
+      // switchMap cancels the previous pending request if a new tick occurs
+      switchMap(() => this.getExecutionDetails(workflowId, executionId)),
+
+      // Continue polling ONLY while state is ACTIVE.
+      // The 'true' argument is vital: it ensures the *final* non-active value 
+      // (SUCCEEDED/FAILED) is emitted before the stream completes.
+      takeWhile(details => details.state === 'ACTIVE', true),
+
+      // Optional: Share the stream if multiple UI components need to listen to the same poll
+      shareReplay(1)
     );
   }
 

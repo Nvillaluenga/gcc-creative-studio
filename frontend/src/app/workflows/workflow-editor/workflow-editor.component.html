@@ -36,9 +36,9 @@
     <!-- Status Badge -->
     <div class="mx-6">
       <ng-container [ngSwitch]="mode">
-        <mat-chip *ngSwitchCase="EditorMode.Run" [ngClass]="getWorkflowStatusClass(currentExecutionState)">
-          <mat-icon *ngIf="getWorkflowStatusIcon(currentExecutionState)" class="!text-sm !w-4 !h-4 mr-1">
-            {{ getWorkflowStatusIcon(currentExecutionState) }}
+        <mat-chip *ngSwitchCase="EditorMode.Run" [ngClass]="currentExecutionState | workflowStatus:'class'">
+          <mat-icon *ngIf="currentExecutionState" class="!text-sm !w-4 !h-4 mr-1">
+            {{ currentExecutionState | workflowStatus:'icon' }}
           </mat-icon>
           {{ currentExecutionState || 'IDLE' }}
         </mat-chip>
@@ -178,9 +178,9 @@
         <div *ngIf="selectedStep" class="step-outputs">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold">{{ selectedStep.type | titlecase }} Outputs</h3>
-            <mat-chip [ngClass]="getStepStatusChipClass(selectedStep.status)">
-              <mat-icon *ngIf="getStepStatusIcon(selectedStep.status)" class="!text-sm !w-4 !h-4 mr-1">
-                {{ getStepStatusIcon(selectedStep.status) }}
+            <mat-chip *ngIf="selectedStep.status !== 'idle'" [ngClass]="selectedStep.status | workflowStatus:'class'">
+              <mat-icon class="!text-sm !w-4 !h-4 mr-1">
+                {{ selectedStep.status | workflowStatus:'icon' }}
               </mat-icon>
               {{ selectedStep.status | uppercase }}
             </mat-chip>
