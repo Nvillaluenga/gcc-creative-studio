@@ -93,8 +93,8 @@
         <ng-container matColumnDef="status">
           <th mat-header-cell *matHeaderCellDef> Status </th>
           <td mat-cell *matCellDef="let exec">
-            <mat-chip [ngClass]="getStatusClass(exec.state)" class="!flex !items-center !justify-center !w-fit">
-              <mat-icon class="!text-sm !w-4 !h-4 mr-1">{{ getStatusIcon(exec.state) }}</mat-icon>
+            <mat-chip [ngClass]="exec.state | workflowStatus:'class'" class="!flex !items-center !justify-center !w-fit">
+              <mat-icon class="!text-sm !w-4 !h-4 mr-1">{{ exec.state | workflowStatus:'icon' }}</mat-icon>
               {{ exec.state }}
             </mat-chip>
           </td>
