@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 class WorkflowsExecutorService:
     def __init__(self):
         self.backend_url = config_service.BACKEND_URL
-        self.rest_client = RestClient(timeout=300)
+        self.rest_client = RestClient(timeout=600)
         self.genai_client = GenAIModelSetup.init()
 
     def _normalize_asset_inputs(
@@ -100,7 +100,7 @@ class WorkflowsExecutorService:
         # Poll configuration
         initial_delay = 2
         poll_interval = 5
-        timeout = 300  # 5 minutes timeout
+        timeout = 600  # 10 minutes timeout
 
         await asyncio.sleep(initial_delay)
 

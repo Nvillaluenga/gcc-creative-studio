@@ -115,14 +115,16 @@ export class WorkflowService implements OnDestroy {
     );
   }
 
-  loadWorkflows(reset = false): void {
+  loadWorkflows(reset = false, clearData = true): void {
     if (this._isLoading.value || (!reset && this._allWorkflowsLoaded.value)) {
       return;
     }
 
     if (reset) {
       this.currentPage = 0;
-      this._workflows.next([]);
+      if (clearData) {
+        this._workflows.next([]);
+      }
       this._allWorkflowsLoaded.next(false);
     }
 
@@ -156,7 +158,7 @@ export class WorkflowService implements OnDestroy {
 
   setFilter(filter: string) {
     this.currentFilter = filter;
-    this.loadWorkflows(true);
+    this.loadWorkflows(true, false);
   }
 
   createWorkflow(

@@ -437,9 +437,17 @@ app-workspace-switcher .workspace-name {
 
 // Medium devices (tablets, 768px and up)
 @media (min-width: 768px) {
-  html,
+  html {
+    min-height: 100%;
+    height: auto;
+    background: transparent !important;
+  }
   body {
-    background-color: #2e3031;
+    min-height: 100vh;
+    background: radial-gradient(ellipse 100% 100% at 50% 0%, #4D4D4D 0%, #161616 100%) !important;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
   }
   :root {
     --color-bg1: transparent;
@@ -474,11 +482,4 @@ app-workspace-switcher .workspace-name {
 
 // 4K Displays (Ultra HD) (Projectors or Higher Resolution Screens, 2160px and up)
 @media screen and (min-width: 2160px) {
-}
-
-// Execution Details Modal
-.execution-details-modal {
-  .mat-mdc-dialog-surface {
-    @apply bg-neutral-800;
-  }
 }

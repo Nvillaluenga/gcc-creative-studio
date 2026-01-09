@@ -29,6 +29,7 @@ import { MediaResolutionService } from '../../shared/media-resolution.service';
 @Component({
     selector: 'app-execution-details-modal',
     templateUrl: './execution-details-modal.component.html',
+    styleUrls: ['./execution-details-modal.component.scss']
 })
 export class ExecutionDetailsModalComponent implements OnInit {
     isLoading = true;
@@ -108,15 +109,7 @@ export class ExecutionDetailsModalComponent implements OnInit {
     }
 
     getStatusClass(state: string): string {
-        switch (state) {
-            case 'SUCCEEDED': return '!bg-green-500/20 !text-green-300';
-            case 'STATE_SUCCEEDED': return '!bg-green-500/20 !text-green-300';
-            case 'FAILED': return '!bg-red-500/20 !text-red-300';
-            case 'STATE_FAILED': return '!bg-red-500/20 !text-red-300';
-            case 'ACTIVE': return '!bg-blue-500/20 !text-blue-300';
-            case 'STATE_IN_PROGRESS': return '!bg-blue-500/20 !text-blue-300';
-            default: return '!bg-gray-500/20 !text-gray-300';
-        }
+        return ''; // Legacy/Unused
     }
 
     getStepType(stepId: string): NodeTypes | string | undefined {

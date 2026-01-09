@@ -106,6 +106,7 @@ export class ExecutionHistoryComponent implements OnInit {
 
         this.dialog.open(ExecutionDetailsModalComponent, {
             width: '800px',
+            maxWidth: '90vw',
             maxHeight: '90vh',
             data: {
                 workflowId: this.workflowId,

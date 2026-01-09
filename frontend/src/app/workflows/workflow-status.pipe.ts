@@ -3,7 +3,10 @@ import { Pipe, PipeTransform } from '@angular/core';
 @Pipe({ name: 'workflowStatus', standalone: true })
 export class WorkflowStatusPipe implements PipeTransform {
   transform(status: string | undefined | null, type: 'icon' | 'class'): string {
-    const s = status?.toUpperCase();
+    let s = status?.toUpperCase();
+    if (s?.startsWith('STATE_')) {
+      s = s.replace('STATE_', '');
+    }
     const config: any = {
       RUNNING: { icon: 'hourglass_top', class: '!bg-blue-500/20 !text-blue-300' },
       ACTIVE: { icon: 'hourglass_top', class: '!bg-blue-500/20 !text-blue-300' }, // Map ACTIVE to RUNNING style
