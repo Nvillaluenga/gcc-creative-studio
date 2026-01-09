@@ -25,8 +25,11 @@ import {
   OnDestroy,
   effect,
   inject,
-  OnInit
+  OnInit,
+  Inject,
+  PLATFORM_ID
 } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import {MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer, SafeResourceUrl, SafeUrl } from '@angular/platform-browser';
 import { MatDialog } from '@angular/material/dialog';
@@ -166,10 +169,14 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
   // Drag state for moving clips along the timeline
   dragState: { active: boolean; clipId: string; startX: number; initialStartTime: number } | null = null;
 
+  isBrowser: boolean;
+
   constructor(
     public matIconRegistry: MatIconRegistry,
     private dialog: MatDialog,
+    @Inject(PLATFORM_ID) platformId: Object
   ) {
+    this.isBrowser = isPlatformBrowser(platformId);
     this.matIconRegistry
     .addSvgIcon(
         'white-gemini-spark-icon',
@@ -720,6 +727,7 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
   // --- Logic: Playback Loop ---
 
   togglePlay() {
+    if (!this.isBrowser) return;
     this.isPlaying.set(!this.isPlaying());
     if (this.isPlaying()) {
         this.runGameLoop();
@@ -729,6 +737,7 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
   }
 
   runGameLoop() {
+      if (!this.isBrowser) return;
       let lastTime = performance.now();
       const loop = (now: number) => {
           if (!this.isPlaying()) return;

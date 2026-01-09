@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {Component, NgZone} from '@angular/core';
+import {Component, NgZone, Inject, PLATFORM_ID} from '@angular/core';
 import {GoogleAuthProvider} from '@angular/fire/auth';
 import {Router} from '@angular/router';
 import {AuthService} from './../common/services/auth.service';
@@ -22,6 +22,7 @@ import {UserModel} from './../common/models/user.model';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import { handleErrorSnackbar } from '../utils/handleMessageSnackbar';
 import {environment} from '../../environments/environment';
+import {isPlatformBrowser} from '@angular/common';
 
 const HOME_ROUTE = '/';
 
@@ -40,13 +41,16 @@ export class LoginComponent {
   loader = false;
   invalidLogin = false;
   errorMessage = '';
+  isBrowser: boolean;
 
   constructor(
     private authService: AuthService,
     private router: Router,
     public ngZone: NgZone,
     private _snackBar: MatSnackBar,
+    @Inject(PLATFORM_ID) platformId: Object
   ) {
+    this.isBrowser = isPlatformBrowser(platformId);
     this.provider.setCustomParameters({
       prompt: 'select_account',
     });
@@ -129,7 +133,9 @@ export class LoginComponent {
   }
 
   redirect(user: UserModel) {
-    localStorage.setItem('USER_DETAILS', JSON.stringify(user));
+    if (this.isBrowser) {
+        localStorage.setItem('USER_DETAILS', JSON.stringify(user));
+    }
     this.loader = false;
     void this.router.navigate([HOME_ROUTE]);
   }

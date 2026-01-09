@@ -25,7 +25,10 @@ import {
   OnInit,
   Output,
   ViewChild,
+  Inject,
+  PLATFORM_ID,
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { MatCheckboxChange } from '@angular/material/checkbox';
 import { MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -80,6 +83,8 @@ export class MediaGalleryComponent implements OnInit, OnDestroy, AfterViewInit {
   public hoveredVideoId: number | null = null;
   public hoveredAudioId: number | null = null;
 
+  isBrowser: boolean;
+
   constructor(
     private galleryService: GalleryService,
     private sanitizer: DomSanitizer,
@@ -87,7 +92,9 @@ export class MediaGalleryComponent implements OnInit, OnDestroy, AfterViewInit {
     private userService: UserService,
     private elementRef: ElementRef,
     private ngZone: NgZone,
+    @Inject(PLATFORM_ID) platformId: Object
   ) {
+    this.isBrowser = isPlatformBrowser(platformId);
     this.matIconRegistry
       .addSvgIcon(
         'mobile-white-gemini-spark-icon',
@@ -138,13 +145,17 @@ export class MediaGalleryComponent implements OnInit, OnDestroy, AfterViewInit {
         this.allImagesLoaded = loaded;
       });
 
-    this.handleResize();
-    this.resizeSubscription = fromEvent(window, 'resize')
-      .pipe(debounceTime(200))
-      .subscribe(() => this.handleResize());
+    if (this.isBrowser) {
+        this.handleResize();
+        this.resizeSubscription = fromEvent(window, 'resize')
+        .pipe(debounceTime(200))
+        .subscribe(() => this.handleResize());
+    }
   }
 
   ngAfterViewInit(): void {
+    if (!this.isBrowser) return;
+
     // This observer's job is to wait until the component's host element is actually
     // visible in the DOM. This is important for components inside lazy-loaded tabs.
     this._hostVisibilityObserver = new IntersectionObserver(([entry]) => {
@@ -159,14 +170,17 @@ export class MediaGalleryComponent implements OnInit, OnDestroy, AfterViewInit {
     this._hostVisibilityObserver.observe(this.elementRef.nativeElement);
   }
 
+
   ngOnDestroy(): void {
     this.stopAudio();
-    // Force pause any lingering audio elements to prevent them from playing after component destruction
-    const audios = this.elementRef.nativeElement.querySelectorAll('audio');
-    audios.forEach((a: HTMLAudioElement) => {
-      a.pause();
-      a.src = '';
-    });
+    if (this.isBrowser) {
+        // Force pause any lingering audio elements to prevent them from playing after component destruction
+        const audios = this.elementRef.nativeElement.querySelectorAll('audio');
+        audios.forEach((a: HTMLAudioElement) => {
+        a.pause();
+        a.src = '';
+        });
+    }
 
     this.imagesSubscription?.unsubscribe();
     this.loadingSubscription?.unsubscribe();

@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute } from '@angular/router';
@@ -54,6 +55,8 @@ export class WorkspaceSwitcherComponent implements OnInit {
   readonly JobStatus = JobStatus;
   public WorkspaceScope = WorkspaceScope;
 
+  isBrowser: boolean;
+
   constructor(
     private workspaceService: WorkspaceService,
     private workspaceStateService: WorkspaceStateService,
@@ -62,8 +65,10 @@ export class WorkspaceSwitcherComponent implements OnInit {
     private route: ActivatedRoute,
     public dialog: MatDialog,
     private snackBar: MatSnackBar,
+    @Inject(PLATFORM_ID) platformId: Object
   ) {
     this.currentUser = this.userService.getUserDetails();
+    this.isBrowser = isPlatformBrowser(platformId);
   }
 
   ngOnInit(): void {
@@ -116,6 +121,8 @@ export class WorkspaceSwitcherComponent implements OnInit {
   }
 
   initializeActiveWorkspace(): void {
+    if (!this.isBrowser) return;
+
     const storedWorkspaceId = localStorage.getItem('activeWorkspaceId');
     const queryParamId = this.route.snapshot.queryParamMap.get('workspaceId');
 
@@ -156,10 +163,13 @@ export class WorkspaceSwitcherComponent implements OnInit {
     this.activeWorkspace =
       this.workspaces.find(w => w.id === workspaceId) || null;
     this.brandGuidelineService.clearCache();
-    if (workspaceId) {
-      localStorage.setItem('activeWorkspaceId', workspaceId.toString());
-    } else {
-      localStorage.removeItem('activeWorkspaceId');
+    
+    if (this.isBrowser) {
+        if (workspaceId) {
+        localStorage.setItem('activeWorkspaceId', workspaceId.toString());
+        } else {
+        localStorage.removeItem('activeWorkspaceId');
+        }
     }
   }
 
@@ -347,9 +357,11 @@ export class WorkspaceSwitcherComponent implements OnInit {
 
   openFeedbackForm(event: MouseEvent): void {
     event.stopPropagation();
-    window.open(
-      'https://docs.google.com/forms/d/e/1FAIpQLSceWvu7G354h-dTbOGvNGEraEjcUAgPE300WNY5qr-WJbh3Eg/viewform',
-      '_blank',
-    );
+    if (this.isBrowser) {
+        window.open(
+        'https://docs.google.com/forms/d/e/1FAIpQLSceWvu7G354h-dTbOGvNGEraEjcUAgPE300WNY5qr-WJbh3Eg/viewform',
+        '_blank',
+        );
+    }
   }
 }
