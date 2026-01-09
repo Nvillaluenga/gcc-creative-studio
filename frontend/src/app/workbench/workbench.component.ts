@@ -19,6 +19,8 @@ import {
   signal,
   computed,
   ViewChild,
+  ViewChildren,
+  QueryList,
   ElementRef,
   OnDestroy,
   effect,
@@ -75,8 +77,19 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
   pixelsPerSecond = 15; // Default reduced from 30 to 15
 
   // Computed Values
-  videoClips = computed(() => this.timelineClips().filter(c => c.trackIndex === 0));
-  audioClips = computed(() => this.timelineClips().filter(c => c.trackIndex === 1));
+  videoClips = computed(() => this.timelineClips().filter(c => c.trackIndex === 0).sort((a, b) => a.startTime - b.startTime));
+  
+  // Group audio clips by track index
+  audioTracks = computed(() => {
+    const clips = this.timelineClips().filter(c => c.trackIndex > 0);
+    if (clips.length === 0) return [[]]; // Always return at least one empty track
+    const maxTrack = Math.max(...clips.map(c => c.trackIndex), 1);
+    const tracks: TimelineClip[][] = [];
+    for (let i = 1; i <= maxTrack; i++) {
+        tracks.push(clips.filter(c => c.trackIndex === i));
+    }
+    return tracks;
+  });
 
   // Filtered assets list based on active tab
   filteredAssets = computed(() => {
@@ -105,9 +118,9 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     return this.videoClips().find(c => time >= c.startTime && time < c.startTime + c.duration);
   });
 
-  activeAudioClip = computed(() => {
+  activeAudioClips = computed(() => {
     const time = this.currentTime();
-    return this.audioClips().find(c => time >= c.startTime && time < c.startTime + c.duration);
+    return this.audioTracks().map(track => track.find(c => time >= c.startTime && time < c.startTime + c.duration));
   });
 
   activeVideoSrc = computed(() => {
@@ -117,11 +130,12 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     return asset ? asset.safeUrl : '';
   });
 
-  activeAudioSrc = computed(() => {
-    const clip = this.activeAudioClip();
-    if (!clip) return '';
-    const asset = this.assets().find(a => a.id === clip.assetId);
-    return asset ? asset.safeUrl : '';
+  activeAudioSrcs = computed(() => {
+    return this.activeAudioClips().map(clip => {
+        if (!clip) return '';
+        const asset = this.assets().find(a => a.id === clip.assetId);
+        return asset ? asset.safeUrl : '';
+    });
   });
 
   videoFilter = computed(() => {
@@ -132,7 +146,7 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
   
   // View Children
   @ViewChild('mainVideo') mainVideo!: ElementRef<HTMLVideoElement>;
-  @ViewChild('bgAudio') bgAudio!: ElementRef<HTMLAudioElement>;
+  @ViewChildren('bgAudio') bgAudios!: QueryList<ElementRef<HTMLAudioElement>>;
   @ViewChild('timelineContainer') timelineContainer!: ElementRef<HTMLDivElement>;
 
   // Services
@@ -241,9 +255,7 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     // Setup an effect to handle video seeking/sync when active clip changes or time jumps
     effect(() => {
       const vid = this.mainVideo?.nativeElement;
-      const aud = this.bgAudio?.nativeElement;
       const vClip = this.activeVideoClip();
-      const aClip = this.activeAudioClip();
       const curTime = this.currentTime();
 
       // Video Sync
@@ -256,20 +268,34 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
         vid.pause();
       }
 
-      // Audio Sync
-      if (aud && aClip) {
-        const fileTime = (curTime - aClip.startTime) + aClip.offset;
-        if (Math.abs(aud.currentTime - fileTime) > 0.5) aud.currentTime = fileTime;
-        if (this.isPlaying() && aud.paused) {
-            aud.play().catch(e => console.error('Audio play failed', e));
-        }
-        if (!this.isPlaying() && !aud.paused) {
-            aud.pause();
-        }
-      } else if (aud) {
-        if (!aud.paused) {
-             aud.pause();
-        }
+      // Audio Sync (Multi-track)
+      const _ = this.audioElementsChanged(); // Dependency
+      const audioElements = this.bgAudios?.toArray();
+      const activeAClips = this.activeAudioClips();
+      
+      if (audioElements) {
+        audioElements.forEach((audioRef, index) => {
+            const aud = audioRef.nativeElement;
+            const aClip = activeAClips[index];
+            
+            if (aud && aClip) {
+                const fileTime = (curTime - aClip.startTime) + aClip.offset;
+                if (Math.abs(aud.currentTime - fileTime) > 0.5) {
+                    aud.currentTime = fileTime;
+                }
+                
+                if (this.isPlaying() && aud.paused) {
+                    aud.play().catch(e => console.error('Audio play failed', e));
+                }
+                if (!this.isPlaying() && !aud.paused) {
+                    aud.pause();
+                }
+            } else if (aud) {
+                if (!aud.paused) {
+                    aud.pause();
+                }
+            }
+        });
       }
     });
   }
@@ -280,7 +306,16 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
       return this.sanitizer.bypassSecurityTrustResourceUrl(url);
     }
 
+  // Signal to track audio element changes
+  audioElementsChanged = signal<number>(0);
+
   ngOnInit() {}
+  
+  ngAfterViewInit() {
+    this.bgAudios.changes.subscribe(() => {
+        this.audioElementsChanged.update(v => v + 1);
+    });
+  }
   
   ngOnDestroy() {
     if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
@@ -493,8 +528,7 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
   refreshTimelineLayout() {
       this.timelineClips.update(clips => {
           const vClips = clips.filter(c => c.trackIndex === 0);
-          const aClips = clips.filter(c => c.trackIndex === 1);
-          const otherClips = clips.filter(c => c.trackIndex !== 0 && c.trackIndex !== 1);
+          const otherClips = clips.filter(c => c.trackIndex !== 0);
 
           const layoutTrack = (trackClips: TimelineClip[]) => {
             let currentTime = 0;
@@ -505,7 +539,7 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
             });
           };
 
-          return [...layoutTrack(vClips), ...layoutTrack(aClips), ...otherClips];
+          return [...layoutTrack(vClips), ...otherClips];
       });
   }
 
@@ -528,6 +562,7 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     const assetColor = this.getRandomColor();
 
     if (asset.type === 'video') {
+      // Magnetic Video: Always add to the end of the video track
       const vClips = this.timelineClips().filter(c => c.trackIndex === 0);
       const vStartTime = vClips.length > 0 ? Math.max(...vClips.map(c => c.startTime + c.duration)) : 0;
       
@@ -540,23 +575,61 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
         trackIndex: 0,
         color: assetColor
       });
+
+      // Add Audio for Video (Synced at same start time)
+      const targetTrack = this.findAvailableAudioTrack(vStartTime, asset.duration);
+      clipsToAdd.push({
+          id: Math.random().toString(36).substr(2, 9),
+          assetId: asset.id,
+          startTime: vStartTime,
+          duration: asset.duration,
+          offset: 0,
+          trackIndex: targetTrack,
+          color: '#10b981' 
+      });
+
+    } else {
+      // Smart Audio: Add at playhead, find first available track
+      const playhead = this.currentTime();
+      const targetTrack = this.findAvailableAudioTrack(playhead, asset.duration);
+
+      clipsToAdd.push({
+          id: Math.random().toString(36).substr(2, 9),
+          assetId: asset.id,
+          startTime: playhead,
+          duration: asset.duration,
+          offset: 0,
+          trackIndex: targetTrack,
+          color: '#10b981' 
+      });
     }
-
-    const aClips = this.timelineClips().filter(c => c.trackIndex === 1);
-    const aStartTime = aClips.length > 0 ? Math.max(...aClips.map(c => c.startTime + c.duration)) : 0;
-
-    clipsToAdd.push({
-        id: Math.random().toString(36).substr(2, 9),
-        assetId: asset.id,
-        startTime: aStartTime,
-        duration: asset.duration,
-        offset: 0,
-        trackIndex: 1,
-        color: asset.type === 'video' ? '#10b981' : '#10b981' 
-    });
 
     this.timelineClips.update(prev => [...prev, ...clipsToAdd]);
   }
+
+  private findAvailableAudioTrack(startTime: number, duration: number): number {
+      const allAudioClips = this.timelineClips().filter(c => c.trackIndex > 0);
+      let targetTrack = 1;
+      let placed = false;
+      
+      while (!placed) {
+        const trackClips = allAudioClips.filter(c => c.trackIndex === targetTrack);
+        const hasOverlap = trackClips.some(c => {
+           const cEnd = c.startTime + c.duration;
+           const newEnd = startTime + duration;
+           return (startTime < cEnd && newEnd > c.startTime);
+        });
+        
+        if (!hasOverlap) {
+            placed = true;
+        } else {
+            targetTrack++;
+        }
+      }
+      return targetTrack;
+  }
+
+
 
   // Start dragging a clip horizontally on the timeline
   startDrag(event: MouseEvent, clip: TimelineClip) {
@@ -780,33 +853,53 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     const movedClip = allClips.find(c => c.id === movedClipId);
     if (!movedClip) return;
 
-    const trackClips = allClips.filter(
-      c => c.trackIndex === movedClip.trackIndex && c.id !== movedClipId
-    );
-    const otherTracks = allClips.filter(c => c.trackIndex !== movedClip.trackIndex);
+    if (movedClip.trackIndex === 0) {
+        // Video Track: Magnetic / Ripple Edit
+        // 1. Sort all video clips by startTime to determine order
+        // 2. Remove gaps
+        const videoClips = allClips.filter(c => c.trackIndex === 0).sort((a, b) => a.startTime - b.startTime);
+        
+        let currentTime = 0;
+        const newVideoClips = videoClips.map(clip => {
+            const newClip = { ...clip, startTime: currentTime };
+            currentTime += clip.duration;
+            return newClip;
+        });
+        
+        // Update state
+        this.timelineClips.update(prev => {
+            const others = prev.filter(c => c.trackIndex !== 0);
+            return [...others, ...newVideoClips];
+        });
 
-    const processedTrackClips = trackClips.map(clip => {
-      const movedEnd = movedClip.startTime + movedClip.duration;
-      const clipEnd = clip.startTime + clip.duration;
-      const isOverlapping = clip.startTime < movedEnd && clipEnd > movedClip.startTime;
-      if (isOverlapping) {
-        return { ...clip, startTime: movedEnd };
-      }
-      return clip;
-    });
-
-    processedTrackClips.push(movedClip);
-    processedTrackClips.sort((a, b) => a.startTime - b.startTime);
-
-    for (let i = 1; i < processedTrackClips.length; i++) {
-      const prev = processedTrackClips[i - 1];
-      const curr = processedTrackClips[i];
-      if (curr.startTime < prev.startTime + prev.duration) {
-        curr.startTime = prev.startTime + prev.duration;
-      }
+    } else {
+        // Audio Track: Gravity
+        // Try to place on Track 1, then 2, etc.
+        const audioClips = allClips.filter(c => c.trackIndex > 0 && c.id !== movedClipId);
+        
+        let targetTrack = 1;
+        let placed = false;
+        const duration = movedClip.duration;
+        const startTime = movedClip.startTime; // Keep the user's dragged time
+        
+        while (!placed) {
+            const trackClips = audioClips.filter(c => c.trackIndex === targetTrack);
+            const hasOverlap = trackClips.some(c => {
+               const cEnd = c.startTime + c.duration;
+               const newEnd = startTime + duration;
+               return (startTime < cEnd && newEnd > c.startTime);
+            });
+            
+            if (!hasOverlap) {
+                placed = true;
+            } else {
+                targetTrack++;
+            }
+        }
+        
+        // Update the clip with the new track index
+        this.timelineClips.update(prev => prev.map(c => c.id === movedClipId ? { ...c, trackIndex: targetTrack } : c));
     }
-
-    this.timelineClips.set([...processedTrackClips, ...otherTracks]);
   }
 
   // --- Utilities ---

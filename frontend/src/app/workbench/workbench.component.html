@@ -149,8 +149,10 @@
                                 [src]="activeVideoSrc()" [muted]="true" (loadedmetadata)="onMetadataLoaded()"
                                 (ended)="onVideoEnded()"></video>
 
-                            <!-- Hidden Audio -->
-                            <audio #bgAudio [src]="activeAudioSrc()"></audio>
+                            <!-- Hidden Audio (Multi-track) -->
+                            <ng-container *ngFor="let src of activeAudioSrcs()">
+                                <audio #bgAudio [src]="src"></audio>
+                            </ng-container>
 
                             <!-- Playback Controls Overlay (Hover) -->
                             <div [class.hidden]="!activeVideoClip()"
@@ -327,9 +329,10 @@
                                     <mat-icon *ngIf="isPlaying()" class="!w-6 !h-6">pause</mat-icon>
                                 </button>
                             </div>
-                            <!-- Audio Control -->
-                            <div class="h-16 flex items-center px-3 gap-6 mt-2">
+                            <!-- Audio Control (Dynamic) -->
+                            <div *ngFor="let track of audioTracks(); let i = index" class="h-16 flex items-center px-3 gap-6 mt-2">
                                 <mat-icon svgIcon="sound-sensing-icon" class="!w-6 !h-6"></mat-icon>
+                                <span class="text-xs text-gray-400">Track {{i+1}}</span>
                                 <div
                                     class="flex gap-2 p-2 bg-gradient-to-b from-zinc-500/50 to-neutral-700/20 rounded-[48px] shadow-[2px_2px_12px_0px_rgba(0,0,0,0.10)] outline outline-1 outline-offset-[-1px] outline-stone-300/80 backdrop-blur-[10px]">
                                     <button
@@ -400,9 +403,9 @@
                                     </div>
                                 </div>
 
-                                <!-- AUDIO TRACK (draggable clips) -->
-                                <div class="h-24 mt-8 relative w-full">
-                                    <div *ngFor="let clip of audioClips()" (mousedown)="startDrag($event, clip)"
+                                <!-- AUDIO TRACKS (draggable clips) -->
+                                <div *ngFor="let track of audioTracks(); let i = index" class="h-24 mt-2 relative w-full">
+                                    <div *ngFor="let clip of track" (mousedown)="startDrag($event, clip)"
                                         (click)="selectClip(clip.id, $event)"
                                         class="absolute top-2 bottom-2 rounded-lg cursor-pointer overflow-hidden border  flex items-center justify-center"
                                         [ngClass]="{
