@@ -131,3 +131,18 @@ export interface ExecutionDetails {
   error?: string;
   step_entries: StepEntry[];
 }
+
+export interface BatchItemResult {
+  row_index: number;
+  execution_id?: string;
+  status: 'SUCCESS' | 'FAILED';
+  error?: string;
+}
+
+export interface BatchExecutionResponse {
+  results: BatchItemResult[];
+}
+
+export interface BatchExecutionRequest {
+  items: { row_index: number; args: any }[];
+}

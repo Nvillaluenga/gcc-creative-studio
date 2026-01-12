@@ -22,6 +22,7 @@ import { handleErrorSnackbar, handleSuccessSnackbar } from '../../utils/handleMe
 import { RunWorkflowModalComponent } from '../workflow-editor/run-workflow-modal/run-workflow-modal.component';
 import { NodeTypes } from '../workflow.models';
 import { WorkflowService } from '../workflow.service';
+import { BatchExecutionModalComponent } from './batch-execution-modal/batch-execution-modal.component';
 import { ExecutionDetailsModalComponent } from './execution-details-modal/execution-details-modal.component';
 
 @Component({
@@ -115,6 +116,33 @@ export class ExecutionHistoryComponent implements OnInit {
             panelClass: 'execution-details-modal'
         });
     }
+
+    openBatchExecution(): void {
+        if (!this.workflowId) return;
+
+        // Ensure workflow is loaded
+        if (!this.workflow) {
+            this.workflowService.getWorkflowById(this.workflowId).subscribe(wf => {
+                this.workflow = wf;
+                this.openBatchDialog();
+            });
+        } else {
+            this.openBatchDialog();
+        }
+    }
+
+    private openBatchDialog(): void {
+        this.dialog.open(BatchExecutionModalComponent, {
+            width: '900px',
+            maxWidth: '95vw',
+            maxHeight: '90vh',
+            data: {
+                workflow: this.workflow
+            },
+            panelClass: 'batch-execution-modal'
+        });
+    }
+
 
 
 

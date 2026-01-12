@@ -27,6 +27,7 @@ import { environment } from '../../environments/environment';
 import { PaginationResponseDto } from '../common/services/source-asset.service';
 import { WorkspaceStateService } from '../services/workspace/workspace-state.service';
 import {
+  BatchExecutionResponse,
   ExecutionDetails,
   ExecutionResponse,
   WorkflowCreateDto,
@@ -209,6 +210,27 @@ export class WorkflowService implements OnDestroy {
     return this.http.post<ExecutionResponse>(
       `${this.API_BASE_URL}/workflows/${workflowId}/workflow-execute`,
       payload
+    );
+  }
+
+  batchExecuteWorkflow(workflowId: string, items: { row_index: number; args: any }[]): Observable<BatchExecutionResponse> {
+    const workspaceId = this.workspaceStateService.getActiveWorkspaceId();
+    if (!workspaceId) {
+      return throwError(() => new Error('No active workspace ID found.'));
+    }
+
+    // Inject workspaceId into each item's args if not present
+    const enrichedItems = items.map(item => ({
+      ...item,
+      args: {
+        ...item.args,
+        workspace_id: workspaceId
+      }
+    }));
+
+    return this.http.post<BatchExecutionResponse>(
+      `${this.API_BASE_URL}/workflows/${workflowId}/batch-execute`,
+      { items: enrichedItems }
     );
   }
 

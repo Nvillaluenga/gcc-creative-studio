@@ -38,6 +38,10 @@
       </div>
       
       <div class="actions-wrapper">
+        <button mat-stroked-button class="secondary-btn" (click)="openBatchExecution()" [disabled]="isLoading" style="margin-right: 8px;">
+            <mat-icon>dataset</mat-icon>
+            Batch
+        </button>
         <button mat-flat-button class="primary-btn" (click)="runWorkflow()" [disabled]="isLoading">
             <mat-icon>play_arrow</mat-icon>
             Run

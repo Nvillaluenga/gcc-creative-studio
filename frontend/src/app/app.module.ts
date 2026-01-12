@@ -91,6 +91,7 @@ import { HomeComponent } from './home/home.component';
 import { LoginComponent } from './login/login.component';
 import { VideoComponent } from './video/video.component';
 import { VtoComponent } from './vto/vto.component';
+import { BatchExecutionModalComponent } from './workflows/execution-history/batch-execution-modal/batch-execution-modal.component';
 import { ExecutionDetailsModalComponent } from './workflows/execution-history/execution-details-modal/execution-details-modal.component';
 import { ExecutionHistoryComponent } from './workflows/execution-history/execution-history.component';
 import { StepExecutionDetailsComponent } from './workflows/shared/step-execution-details/step-execution-details.component';
@@ -134,6 +135,7 @@ import { WorkflowStatusPipe } from './workflows/workflow-status.pipe';
 
     ExecutionDetailsModalComponent,
     StepExecutionDetailsComponent,
+    BatchExecutionModalComponent,
   ],
   imports: [
     BrowserModule,
