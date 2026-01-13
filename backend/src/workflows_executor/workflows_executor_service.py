@@ -33,7 +33,7 @@ from src.workflows_executor.dto.workflows_executor_dto import (
     VirtualTryOnRequest,
     GenerateAudioRequest,
 )
-from src.workflows.schema.workflow_model import ReferenceImage
+from src.workflows.schema.workflow_model import ReferenceMediaOrAsset
 from src.config.config_service import config_service
 
 logging.basicConfig(level=logging.INFO)
@@ -67,15 +67,7 @@ class WorkflowsExecutorService:
                     yield x
 
         for item in flatten(raw_list):
-            if isinstance(item, int):
-                media_items.append(
-                    {
-                        "media_item_id": item,
-                        "media_index": 0,
-                        "role": default_role.value,
-                    }
-                )
-            elif isinstance(item, ReferenceImage):
+            if isinstance(item, ReferenceMediaOrAsset):
                 if item.sourceMediaItem:
                     media_items.append(
                         {
@@ -384,7 +376,7 @@ class WorkflowsExecutorService:
         # logic here
         return {"cropped_image": "https://example.com/cropped_image.png"}
 
-    def _map_to_vto_input_link(self, input_data: int | list | ReferenceImage) -> Optional[dict]:
+    def _map_to_vto_input_link(self, input_data: list | ReferenceMediaOrAsset) -> Optional[dict]:
         if not input_data:
             return None
 
@@ -394,8 +386,8 @@ class WorkflowsExecutorService:
                 return None
             input_data = input_data[0]
 
-        # Handle ReferenceImage
-        if isinstance(input_data, ReferenceImage):
+        # Handle ReferenceMediaOrAsset
+        if isinstance(input_data, ReferenceMediaOrAsset):
             if input_data.sourceMediaItem:
                 return {
                     "source_media_item": {
@@ -405,14 +397,6 @@ class WorkflowsExecutorService:
                 }
             elif input_data.sourceAssetId:
                 return {"source_asset_id": input_data.sourceAssetId}
-
-        if isinstance(input_data, int):
-            return {
-                "source_media_item": {
-                    "media_item_id": input_data,
-                    "media_index": 0,
-                }
-            }
 
         return None
 
