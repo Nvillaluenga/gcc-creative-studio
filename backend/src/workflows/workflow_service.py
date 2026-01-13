@@ -351,33 +351,46 @@ class WorkflowService:
             try:
                 # 1. Process Arguments (Ingest GCS URIs)
                 processed_args = {}
-                for key, value in item.args.items():
-                    if isinstance(value, str) and value.startswith("gs://"):
-                         # Attempt to ingest
-                         try:
-                             # We need a workspace_id. 
-                             # The Frontend passes 'workspace_id' in the args normally for execute_workflow.
-                             # If not, we try to fallback or fail.
-                             workspace_id = item.args.get("workspace_id")
-                             if not workspace_id: 
-                                raise ValueError("No workspace_id provided.")
+                workspace_id = item.args.get("workspace_id")
 
-                             # This potentially accesses the DB (check duplicate, create asset).
-                             # We must lock it to avoid "Transaction is closed" errors on shared session.
-                             async with db_lock:
-                                 asset = await self.source_asset_service.create_from_gcs_uri(
-                                     user=user,
-                                     workspace_id=int(workspace_id),
-                                     gcs_uri=value
-                                 )
-                             processed_args[key] = asset.id
+                async def ingest_gcs_uri(uri: str, w_id: int):
+                    async with db_lock:
+                        asset = await self.source_asset_service.create_from_gcs_uri(
+                            user=user,
+                            workspace_id=w_id,
+                            gcs_uri=uri
+                        )
+                    # Return structure compatible with ReferenceImage pydantic model
+                    return {"sourceAssetId": asset.id, "previewUrl": uri}
+
+                for key, value in item.args.items():
+                    is_gcs_string = isinstance(value, str) and value.startswith("gs://")
+                    is_gcs_list = (
+                        isinstance(value, list)
+                        and len(value) > 0
+                        and isinstance(value[0], str)
+                        and value[0].startswith("gs://")
+                    )
+
+                    if is_gcs_string or is_gcs_list:
+                         try:
+                             if not workspace_id: 
+                                raise ValueError("No workspace_id provided for GCS ingestion.")
+                             
+                             w_id = int(workspace_id)
+                             
+                             if is_gcs_string:
+                                 processed_args[key] = await ingest_gcs_uri(value, w_id)
+                             else:
+                                 # It's a list
+                                 processed_args[key] = [
+                                     await ingest_gcs_uri(uri, w_id) for uri in value
+                                 ]
                          except Exception as e:
-                             # If GCS ingestion fails, we fail this row.
-                             # The user specifically requested this.
                              return BatchItemResultDto(
                                  row_index=item.row_index,
                                  status="FAILED",
-                                 error=f"Invalid GCS URI '{value}': {str(e)}"
+                                 error=f"Invalid GCS URI in '{key}': {str(e)}"
                              )
                     else:
                         processed_args[key] = value
