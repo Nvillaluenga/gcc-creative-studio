@@ -67,7 +67,15 @@ class WorkflowsExecutorService:
                     yield x
 
         for item in flatten(raw_list):
-            if isinstance(item, ReferenceMediaOrAsset):
+            if isinstance(item, int):
+                media_items.append(
+                    {
+                        "media_item_id": item,
+                        "media_index": 0,
+                        "role": default_role.value,
+                    }
+                )
+            elif isinstance(item, ReferenceMediaOrAsset):
                 if item.sourceMediaItem:
                     media_items.append(
                         {
@@ -376,7 +384,7 @@ class WorkflowsExecutorService:
         # logic here
         return {"cropped_image": "https://example.com/cropped_image.png"}
 
-    def _map_to_vto_input_link(self, input_data: list | ReferenceMediaOrAsset) -> Optional[dict]:
+    def _map_to_vto_input_link(self, input_data: int | list | ReferenceMediaOrAsset) -> Optional[dict]:
         if not input_data:
             return None
 
@@ -397,6 +405,14 @@ class WorkflowsExecutorService:
                 }
             elif input_data.sourceAssetId:
                 return {"source_asset_id": input_data.sourceAssetId}
+
+        if isinstance(input_data, int):
+            return {
+                "source_media_item": {
+                    "media_item_id": input_data,
+                    "media_index": 0,
+                }
+            }
 
         return None
 

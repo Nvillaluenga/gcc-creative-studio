@@ -123,7 +123,7 @@ class BaseStep(BaseDto, Generic[InputT, SettingsT]):
 
 
 
-WorkflowInputItem = Union[StepOutputReference, ReferenceMediaOrAsset, List[Union[StepOutputReference, ReferenceMediaOrAsset]]]
+WorkflowInputItem = Union[StepOutputReference, ReferenceMediaOrAsset, int, List[Union[StepOutputReference, ReferenceMediaOrAsset, int]]]
 
 # --- User Input ---
 class UserInputInputs(BaseModel):
