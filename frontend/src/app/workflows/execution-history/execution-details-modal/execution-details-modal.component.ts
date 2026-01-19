@@ -18,7 +18,6 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { WorkflowService } from '../../workflow.service';
 
-import { forkJoin } from 'rxjs';
 import { NodeTypes, WorkflowModel } from '../../workflow.models';
 
 import { GalleryService } from '../../../gallery/gallery.service';
@@ -57,23 +56,23 @@ export class ExecutionDetailsModalComponent implements OnInit {
 
     loadDetails(): void {
         this.isLoading = true;
-        // ForkJoin to get both details and workflow definition
-        forkJoin({
-            details: this.workflowService.getExecutionDetails(this.data.workflowId, this.data.executionId),
-            workflow: this.workflowService.getWorkflowById(this.data.workflowId)
-        }).subscribe({
-            next: ({ details, workflow }) => {
-                this.details = details;
-                this.workflow = workflow as WorkflowModel;
-                this.filterStepEntries();
-                this.resolveMediaUrls();
-                this.isLoading = false;
-            },
-            error: (err) => {
-                console.error('Failed to load details or workflow', err);
-                this.isLoading = false;
-            }
-        });
+        this.workflowService.getExecutionDetails(this.data.workflowId, this.data.executionId)
+            .subscribe({
+                next: (details) => {
+                    this.details = details;
+                    if (details.workflow_definition) {
+                        this.workflow = details.workflow_definition as WorkflowModel;
+                    }
+
+                    this.filterStepEntries();
+                    this.resolveMediaUrls();
+                    this.isLoading = false;
+                },
+                error: (err) => {
+                    console.error('Failed to load details', err);
+                    this.isLoading = false;
+                }
+            });
     }
 
     filterStepEntries(): void {

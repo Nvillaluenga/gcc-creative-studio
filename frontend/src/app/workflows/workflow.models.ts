@@ -130,6 +130,7 @@ export interface ExecutionDetails {
   duration: number;
   error?: string;
   step_entries: StepEntry[];
+  workflow_definition?: WorkflowModel;
 }
 
 export interface BatchItemResult {

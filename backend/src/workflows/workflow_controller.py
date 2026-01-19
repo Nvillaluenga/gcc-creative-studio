@@ -147,6 +147,7 @@ async def execute_workflow(
     workflow_id: str,
     workflow_execute_dto: WorkflowExecuteDto,
     authorization: str | None = Header(default=None),
+    current_user: UserModel = Depends(get_current_user),
     workflow_service: WorkflowService = Depends(),
 ):
     """
@@ -154,8 +155,10 @@ async def execute_workflow(
     """
     workflow_execute_dto.args["user_auth_header"] = authorization
 
-    response = workflow_service.execute_workflow(
-        workflow_id=workflow_id, args=workflow_execute_dto.args
+    response = await workflow_service.execute_workflow(
+        workflow_id=workflow_id,
+        args=workflow_execute_dto.args,
+        user=current_user
     )
     print(f"Created execution: {response}")
     return {"execution_id": response}

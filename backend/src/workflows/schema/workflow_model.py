@@ -349,7 +349,6 @@ class WorkflowModel(BaseStringDocument, WorkflowBase):
     The editable workflow *definition* (template).
     This is what the user edits in the UI.
     """
-    id: str  # Explicitly override to str
     user_id: int
 
 
