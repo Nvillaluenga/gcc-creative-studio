@@ -17,18 +17,13 @@
 <div class="workflow-list-container">
   <!-- Header -->
   <div class="header-section">
-    <div class="top-actions-group">
-      <button mat-icon-button>
-        <mat-icon>arrow_back</mat-icon>
-      </button>
-    </div>
     <div class="in-line-wrapper">
       <div class="title-group">
         <h1 class="page-title">My Workflows</h1>
       </div>
       <button
         mat-flat-button
-        class="create-btn"
+        class="btn-cta"
         *ngIf="authService.isUserAdmin()"
         (click)="createNewWorkflow()"
       >
@@ -120,6 +115,7 @@
             mat-icon-button
             (click)="$event.stopPropagation()"
             [routerLink]="['/workflows/edit', wf.id]"
+            [queryParams]="{ returnUrl: '/workflows' }"
             matTooltip="Edit Definition"
           >
             <mat-icon>edit</mat-icon>
