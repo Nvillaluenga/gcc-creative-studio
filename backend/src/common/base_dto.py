@@ -60,7 +60,7 @@ class GenerationModelEnum(str, Enum):
     GEMINI_3_PRO_PREVIEW = "gemini-3-pro-preview"
     GEMINI_3_PRO_IMAGE_PREVIEW = "gemini-3-pro-image-preview"
     GEMINI_3_FLASH_PREVIEW = "gemini-3-flash-preview"
-    VTO = "virtual-try-on-preview-08-04"
+    VTO = "virtual-try-on-001"
 
     # Video-Specific Models
     VEO_3_1_PREVIEW = "veo-3.1-generate-preview"
