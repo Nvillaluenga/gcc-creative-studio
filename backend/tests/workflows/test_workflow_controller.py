@@ -29,7 +29,10 @@ from src.workflows.workflow_service import WorkflowService
 @pytest.fixture(name="mock_user")
 def fixture_mock_user():
     return UserModel(
-        id=1, email="test@example.com", name="Test User", roles=[UserRoleEnum.WORKFLOWS]
+        id=1,
+        email="test@example.com",
+        name="Test User",
+        roles=[UserRoleEnum.WORKFLOWS],
     )
 
 
