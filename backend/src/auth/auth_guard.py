@@ -56,7 +56,22 @@ async def get_current_user(
     """
     try:
         decoded_token = {}
-        if config_service.ENVIRONMENT == "local":
+        if token.startswith("ya29."):
+            # --- Verify Google OAuth Access Token (Agent Engine) ---
+            logger.info("Verifying Google OAuth Access Token...")
+            import requests
+            response = await asyncio.to_thread(
+                requests.get,
+                f"https://oauth2.googleapis.com/tokeninfo?access_token={token}",
+                timeout=10,
+            )
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"Invalid Google access token: {response.text}",
+                )
+            decoded_token = response.json()
+        elif config_service.ENVIRONMENT == "local":
             # --- Local: Use Firebase Auth ---
             # Verifies the token using the standard Firebase Admin SDK method.
             logger.info("Verifying token using Firebase Admin SDK...")
