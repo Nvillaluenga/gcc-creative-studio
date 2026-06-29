@@ -558,6 +558,7 @@ class AgentService:
         request: Request,
     ) -> dict:
         body = payload.model_dump(exclude_unset=True)
+        injections = []
         if "appName" not in body:
             body["appName"] = APP_NAME
 
