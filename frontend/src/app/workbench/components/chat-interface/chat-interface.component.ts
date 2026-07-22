@@ -301,7 +301,6 @@ export class ChatInterfaceComponent
         }
 
         // Fallback check if it's a relative path and wasn't successfully resolved/verified above
-        // Fallback check if it's a relative path and wasn't successfully resolved/verified above
         if (!isSafe) {
           const hasProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(href);
           const hasBackslash = href.includes('\\');
@@ -310,15 +309,18 @@ export class ChatInterfaceComponent
             sanitizedHref = href;
           }
         }
+      }
 
       if (!isSafe) {
         return text;
       }
 
       const escapedTitle = title ? title.replace(/"/g, '&quot;') : '';
-      const escapedTitle = title ? title.replace(/"/g, '&quot;') : '';
-      const escapedHref = sanitizedHref ? sanitizedHref.replace(/"/g, '&quot;') : '';
+      const escapedHref = sanitizedHref
+        ? sanitizedHref.replace(/"/g, '&quot;')
+        : '';
       return `<a href="${escapedHref}" title="${escapedTitle}" target="_blank" rel="noopener noreferrer" class="markdown-link">${text}</a>`;
+    };
     this.initializeAgentChat();
     this.loadChatSessions();
 
