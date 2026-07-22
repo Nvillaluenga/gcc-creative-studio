@@ -40,7 +40,7 @@ import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {MatIconModule} from '@angular/material/icon';
 import {MatButtonModule} from '@angular/material/button';
-import {MarkdownModule} from 'ngx-markdown';
+import {MarkdownModule, MarkdownService} from 'ngx-markdown';
 
 import {ConfirmationDialogComponent} from '../../../common/components/confirmation-dialog/confirmation-dialog.component';
 import {MatDialog, MatDialogRef} from '@angular/material/dialog';
@@ -48,6 +48,7 @@ import {
   ImageSelectorComponent,
   MediaItemSelection,
 } from '../../../common/components/image-selector/image-selector.component';
+import {GalleryService} from '../../../gallery/gallery.service';
 import {SourceAssetResponseDto} from '../../../common/services/source-asset.service';
 import {environment} from '../../../../environments/environment';
 import {MatSnackBar} from '@angular/material/snack-bar';
@@ -82,6 +83,8 @@ export class ChatInterfaceComponent
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private timelineState = inject(TimelineStateService);
+  private galleryService = inject(GalleryService);
+  private markdownService = inject(MarkdownService);
 
   sessions = this.agentChatService.sessions;
   topics = signal<{[key: string]: any}>({});
@@ -134,6 +137,65 @@ export class ChatInterfaceComponent
     }
   });
 
+  private resolvingAssetIds = new Set<string>();
+
+  private resolveMessageImagesEffect = effect(
+    () => {
+      const messages = this.chatMessages();
+      messages.forEach(msg => {
+        if (msg.images) {
+          msg.images.forEach((img: any) => {
+            const isMediaItem = 'mediaItem' in img;
+            const assetId = isMediaItem
+              ? String(img.mediaItem.id)
+              : String(img.id);
+
+            if (this.resolvingAssetIds.has(assetId)) {
+              return;
+            }
+
+            if (isMediaItem) {
+              if (!img.mediaItem.presignedUrls) {
+                this.resolvingAssetIds.add(assetId);
+                const id = Number(assetId);
+                this.galleryService.getMedia(id).subscribe({
+                  next: res => {
+                    img.mediaItem.presignedUrls = res.presignedUrls;
+                    img.mediaItem.presignedThumbnailUrls =
+                      res.presignedThumbnailUrls;
+                    this.chatMessages.update(msgs => [...msgs]);
+                  },
+                  error: err => {
+                    console.error('Failed to resolve media item:', id, err);
+                    this.resolvingAssetIds.delete(assetId);
+                  },
+                });
+              }
+            } else {
+              if (!img.presignedUrl) {
+                this.resolvingAssetIds.add(assetId);
+                const id = Number(assetId);
+                this.galleryService.getAsset(id).subscribe({
+                  next: res => {
+                    img.presignedUrl = res.presignedUrls?.[0] || '';
+                    img.presignedThumbnailUrl =
+                      res.presignedThumbnailUrls?.[0] || '';
+                    this.chatMessages.update(msgs => [...msgs]);
+                  },
+                  error: err => {
+                    console.error('Failed to resolve source asset:', id, err);
+                    this.resolvingAssetIds.delete(assetId);
+                  },
+                });
+              }
+            }
+          });
+        }
+      });
+    },
+    {allowSignalWrites: true},
+  );
+
   chatInputValue = signal<string>('');
   isInputExpanded = signal<boolean>(false);
 
@@ -184,6 +246,79 @@ export class ChatInterfaceComponent
 
   ngOnInit() {
     this.isBrowser = typeof window !== 'undefined';
+    this.markdownService.renderer.link = (
+      arg1: any,
+      arg2?: any,
+      arg3?: any,
+    ) => {
+      let href = '';
+      let title = '';
+      let text = '';
+
+      if (typeof arg1 === 'object' && arg1 !== null) {
+        href = arg1.href || '';
+        title = arg1.title || '';
+        text = arg1.text || '';
+      } else {
+        href = arg1 || '';
+        title = arg2 || '';
+        text = arg3 || '';
+      }
+
+      let isSafe = false;
+      let sanitizedHref = '';
+      const baseOrigin =
+        typeof window !== 'undefined' ? window.location.origin : '';
+      let URLConstructor = typeof window !== 'undefined' ? window.URL : null;
+      if (!URLConstructor) {
+        try {
+          const g = Function('return this')();
+          URLConstructor = g ? g.URL : null;
+        } catch (e) {
+          // Fallback if dynamic function execution is blocked by CSP
+        }
+      }
+
+      if (href) {
+        if (URLConstructor) {
+          try {
+            const parsedUrl = baseOrigin
+              ? new URLConstructor(href, baseOrigin)
+              : new URLConstructor(href);
+            const protocolSafe =
+              parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+            const originMatches =
+              !baseOrigin || parsedUrl.origin === baseOrigin;
+
+            if (protocolSafe && originMatches) {
+              isSafe = true;
+              sanitizedHref = parsedUrl.href;
+            }
+          } catch (e) {
+            // URL parsing failed
+          }
+        }
+
+        // Fallback check if it's a relative path and wasn't successfully resolved/verified above
+        if (!isSafe) {
+          if (
+            !href.includes(':') &&
+            !href.startsWith('//') &&
+            !href.startsWith('javascript:')
+          ) {
+            isSafe = true;
+            sanitizedHref = href;
+          }
+        }
+      }
+
+      if (!isSafe) {
+        return text;
+      }
+
+      const escapedTitle = title ? title.replace(/"/g, '&quot;') : '';
+      return `<a href="${sanitizedHref}" title="${escapedTitle}" target="_blank" rel="noopener noreferrer" class="markdown-link">${text}</a>`;
+    };
     this.initializeAgentChat();
     this.loadChatSessions();
 
