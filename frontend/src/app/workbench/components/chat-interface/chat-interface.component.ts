@@ -280,6 +280,7 @@ export class ChatInterfaceComponent
       }
 
       if (href) {
+        href = href.trim();
         if (URLConstructor) {
           try {
             const parsedUrl = baseOrigin
@@ -301,11 +302,8 @@ export class ChatInterfaceComponent
 
         // Fallback check if it's a relative path and wasn't successfully resolved/verified above
         if (!isSafe) {
-          if (
-            !href.includes(':') &&
-            !href.startsWith('//') &&
-            !href.startsWith('javascript:')
-          ) {
+          const hasProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(href);
+          if (!hasProtocol && !href.startsWith('//')) {
             isSafe = true;
             sanitizedHref = href;
           }

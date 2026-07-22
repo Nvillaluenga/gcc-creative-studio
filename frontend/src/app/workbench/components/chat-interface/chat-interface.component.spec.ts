@@ -237,6 +237,34 @@ describe('ChatInterfaceComponent', () => {
       expect(result).toBe('Click here');
     });
 
+    it('should sanitize javascript protocol links with leading spaces as plain text', () => {
+      const result = linkRenderer(
+        '   javascript:alert(1)  ',
+        'XSS',
+        'Click here',
+      );
+      expect(result).toBe('Click here');
+    });
+
+    it('should render relative links with colons in query parameters or path', () => {
+      const currentOrigin = window.location.origin;
+      const resultQuery = linkRenderer(
+        '/gallery/view?id=abc:123',
+        'Gallery Query',
+        'View query',
+      );
+      expect(resultQuery).toContain(
+        `href="${currentOrigin}/gallery/view?id=abc:123"`,
+      );
+
+      const resultPath = linkRenderer(
+        '/assets/color:blue',
+        'Blue Assets',
+        'Blue',
+      );
+      expect(resultPath).toContain(`href="${currentOrigin}/assets/color:blue"`);
+    });
+
     it('should escape double quotes in the title attribute', () => {
       const result = linkRenderer(
         '/gallery/123',
