@@ -316,8 +316,9 @@ export class ChatInterfaceComponent
       }
 
       const escapedTitle = title ? title.replace(/"/g, '&quot;') : '';
-      return `<a href="${sanitizedHref}" title="${escapedTitle}" target="_blank" rel="noopener noreferrer" class="markdown-link">${text}</a>`;
-    };
+      const escapedTitle = title ? title.replace(/"/g, '&quot;') : '';
+      const escapedHref = sanitizedHref ? sanitizedHref.replace(/"/g, '&quot;') : '';
+      return `<a href="${escapedHref}" title="${escapedTitle}" target="_blank" rel="noopener noreferrer" class="markdown-link">${text}</a>`;
     this.initializeAgentChat();
     this.loadChatSessions();
 
