@@ -301,14 +301,15 @@ export class ChatInterfaceComponent
         }
 
         // Fallback check if it's a relative path and wasn't successfully resolved/verified above
+        // Fallback check if it's a relative path and wasn't successfully resolved/verified above
         if (!isSafe) {
           const hasProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(href);
-          if (!hasProtocol && !href.startsWith('//')) {
+          const hasBackslash = href.includes('\\');
+          if (!hasProtocol && !href.startsWith('//') && !hasBackslash) {
             isSafe = true;
             sanitizedHref = href;
           }
         }
-      }
 
       if (!isSafe) {
         return text;
