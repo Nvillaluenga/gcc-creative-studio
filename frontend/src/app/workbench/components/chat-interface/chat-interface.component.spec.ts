@@ -246,6 +246,29 @@ describe('ChatInterfaceComponent', () => {
       expect(result).toBe('Click here');
     });
 
+    it('should sanitize javascript links containing control characters (tabs, newlines, carriage returns) as plain text', () => {
+      const resultTab = linkRenderer(
+        'java\tscript:alert(1)',
+        'XSS',
+        'Click here',
+      );
+      expect(resultTab).toBe('Click here');
+
+      const resultNewline = linkRenderer(
+        'java\nscript:alert(2)',
+        'XSS',
+        'Click here',
+      );
+      expect(resultNewline).toBe('Click here');
+
+      const resultCR = linkRenderer(
+        'java\rscript:alert(3)',
+        'XSS',
+        'Click here',
+      );
+      expect(resultCR).toBe('Click here');
+    });
+
     it('should render relative links with colons in query parameters or path', () => {
       const currentOrigin = window.location.origin;
       const resultQuery = linkRenderer(

@@ -280,7 +280,7 @@ export class ChatInterfaceComponent
       }
 
       if (href) {
-        href = href.trim();
+        href = href.trim().replace(/[\t\n\r]/g, '');
         if (URLConstructor) {
           try {
             const parsedUrl = baseOrigin
