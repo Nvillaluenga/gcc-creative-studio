@@ -211,4 +211,80 @@ describe('TransitionIndicatorComponent', () => {
       });
     });
   });
+
+  describe('durationSeconds setter', () => {
+    it('should set durationSeconds as is if value is null', () => {
+      component.durationSeconds = null as any;
+      expect(component.durationSeconds).toBeNull();
+    });
+
+    it('should set durationSeconds as is if value is undefined', () => {
+      component.durationSeconds = undefined as any;
+      expect(component.durationSeconds).toBeUndefined();
+    });
+
+    it('should set durationSeconds as is if value is NaN', () => {
+      component.durationSeconds = NaN;
+      expect(component.durationSeconds).toBeNaN();
+    });
+
+    it('should cap durationSeconds at 4 if value is greater than 4', () => {
+      component.durationSeconds = 5.5;
+      expect(component.durationSeconds).toBe(4);
+    });
+
+    it('should clamp durationSeconds at 0 if value is less than 0', () => {
+      component.durationSeconds = -1.2;
+      expect(component.durationSeconds).toBe(0);
+    });
+
+    it('should set valid durationSeconds correctly', () => {
+      component.durationSeconds = 2.5;
+      expect(component.durationSeconds).toBe(2.5);
+    });
+  });
+
+  describe('isSaveDisabled getter', () => {
+    it('should return true if there are no changes', () => {
+      component.transition = {type: TransitionType.FADE, duration_seconds: 2.0};
+      component.selectedType = TransitionType.FADE;
+      component.durationSeconds = 2.0;
+      expect(component.isSaveDisabled).toBeTrue();
+    });
+
+    it('should return false if there are changes and selected type is NONE', () => {
+      component.transition = {type: TransitionType.FADE, duration_seconds: 2.0};
+      component.selectedType = TransitionType.NONE;
+      component.durationSeconds = 0;
+      expect(component.isSaveDisabled).toBeFalse();
+    });
+
+    it('should return true if selected type is not NONE and duration is 0', () => {
+      component.transition = {type: TransitionType.FADE, duration_seconds: 2.0};
+      component.selectedType = TransitionType.WIPE_LEFT;
+      component.durationSeconds = 0;
+      expect(component.isSaveDisabled).toBeTrue();
+    });
+
+    it('should return true if selected type is not NONE and duration is <= 0', () => {
+      component.transition = {type: TransitionType.FADE, duration_seconds: 2.0};
+      component.selectedType = TransitionType.WIPE_LEFT;
+      (component as any)._durationSeconds = -1;
+      expect(component.isSaveDisabled).toBeTrue();
+    });
+
+    it('should return true if selected type is not NONE and duration is > 4', () => {
+      component.transition = {type: TransitionType.FADE, duration_seconds: 2.0};
+      component.selectedType = TransitionType.WIPE_LEFT;
+      (component as any)._durationSeconds = 5;
+      expect(component.isSaveDisabled).toBeTrue();
+    });
+
+    it('should return false if selected type is not NONE and duration is valid and there are changes', () => {
+      component.transition = {type: TransitionType.FADE, duration_seconds: 2.0};
+      component.selectedType = TransitionType.WIPE_LEFT;
+      component.durationSeconds = 3.0;
+      expect(component.isSaveDisabled).toBeFalse();
+    });
+  });
 });

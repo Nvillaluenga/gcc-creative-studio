@@ -171,6 +171,7 @@ class ProjectRepository(BaseRepository[Project, ProjectResponse]):
             .options(
                 selectinload(self.model.storyboard),
                 selectinload(self.model.timeline),
+                selectinload(self.model.sessions),
             )
             .execution_options(include_deleted=include_deleted)
         )

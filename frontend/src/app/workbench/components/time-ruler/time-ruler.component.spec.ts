@@ -70,4 +70,16 @@ describe('TimeRulerComponent', () => {
 
     expect(mockElement.scrollLeft).toBe(100);
   });
+
+  it('should not crash on setScrollLeft if rulerContainer is null/undefined', () => {
+    (component as any).rulerContainer = null;
+    expect(() => component.setScrollLeft(100)).not.toThrow();
+  });
+
+  it('should calculate correct ticks when totalDuration is greater than 60', () => {
+    component.totalDuration = 120;
+    const ticks = component.timeRulerTicks;
+    expect(ticks.length).toBe(61); // 0 to 120 with step 2
+    expect(ticks[ticks.length - 1]).toBe(120);
+  });
 });

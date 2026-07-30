@@ -140,7 +140,7 @@
             placeholder="Name..."
             (keydown.enter)="saveAdd($event)"
             (keydown.escape)="cancelAdd($event)"
-            focus="true"
+            autofocus
           />
           <button mat-icon-button class="edit-action-btn" (click)="saveAdd($event)">
             <mat-icon class="text-green-400">check</mat-icon>

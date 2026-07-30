@@ -26,11 +26,18 @@ import {RouterTestingModule} from '@angular/router/testing';
 import {ActivatedRoute, Router} from '@angular/router';
 import {FormsModule} from '@angular/forms';
 import {MatDialogModule, MatDialog} from '@angular/material/dialog';
-import {MatSnackBarModule} from '@angular/material/snack-bar';
-import {MarkdownModule} from 'ngx-markdown';
-import {signal, CUSTOM_ELEMENTS_SCHEMA} from '@angular/core';
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
+import {MarkdownModule, MarkdownService} from 'ngx-markdown';
+import {signal, CUSTOM_ELEMENTS_SCHEMA, Injector} from '@angular/core';
 import {of, Subject, BehaviorSubject, throwError} from 'rxjs';
-import {AgentChatService} from '../../services/agent-chat.service';
+import {delay} from 'rxjs/operators';
+import {AppInjector, setAppInjector} from '../../../app-injector';
+import {NotificationService} from '../../../common/services/notification.service';
+import {GalleryService} from '../../../gallery/gallery.service';
+import {
+  AgentChatService,
+  SSECallbacks,
+} from '../../services/agent-chat.service';
 import {WorkspaceStateService} from '../../../services/workspace/workspace-state.service';
 import {ProjectStateService} from '../../../services/project/project-state.service';
 import {StoryboardService} from '../../../services/storyboard/storyboard.service';
@@ -127,6 +134,11 @@ describe('ChatInterfaceComponent', () => {
           },
         ),
       stopPolling: jasmine.createSpy('stopPolling'),
+      startPolling: jasmine
+        .createSpy('startPolling')
+        .and.callFake((sessionId: string, callbacks: any) => {
+          sseCallbacks = callbacks;
+        }),
     };
 
     let isFirstCall = true;
@@ -174,6 +186,21 @@ describe('ChatInterfaceComponent', () => {
       transitionOut: signal<any>(null),
     };
 
+    const mockGalleryService = {
+      getMedia: jasmine.createSpy('getMedia').and.returnValue(
+        of({
+          presignedUrls: ['http://media-url'],
+          presignedThumbnailUrls: ['http://thumb-url'],
+        }),
+      ),
+      getAsset: jasmine.createSpy('getAsset').and.returnValue(
+        of({
+          presignedUrls: ['http://asset-url'],
+          presignedThumbnailUrls: ['http://asset-thumb-url'],
+        }),
+      ),
+    };
+
     queryParamsSubject = new BehaviorSubject<any>({});
 
     await TestBed.configureTestingModule({
@@ -192,6 +219,7 @@ describe('ChatInterfaceComponent', () => {
         {provide: ProjectStateService, useValue: mockProjectStateService},
         {provide: StoryboardService, useValue: mockStoryboardService},
         {provide: TimelineStateService, useValue: mockTimelineStateService},
+        {provide: GalleryService, useValue: mockGalleryService},
         {
           provide: ActivatedRoute,
           useValue: {
@@ -208,6 +236,25 @@ describe('ChatInterfaceComponent', () => {
     storyboardService = TestBed.inject(StoryboardService);
     router = TestBed.inject(Router);
     fixture.detectChanges();
+    if (AppInjector) {
+      if (jasmine.isSpy(AppInjector.get)) {
+        (AppInjector.get as jasmine.Spy).and.callFake((token: any) => {
+          if (token === NotificationService) {
+            return TestBed.inject(NotificationService);
+          }
+          return undefined;
+        });
+      } else {
+        spyOn(AppInjector, 'get').and.callFake((token: any) => {
+          if (token === NotificationService) {
+            return TestBed.inject(NotificationService);
+          }
+          return undefined;
+        });
+      }
+    } else {
+      setAppInjector(TestBed.inject(Injector));
+    }
   });
 
   it('should create', () => {
@@ -1096,6 +1143,1586 @@ describe('ChatInterfaceComponent', () => {
     it('should call stopPolling on onAgentChange', () => {
       component.onAgentChange('script_writer');
       expect(agentChatService.stopPolling).toHaveBeenCalled();
+    });
+  });
+
+  describe('Session Detail & Stream Error Paths', () => {
+    it('should trigger programmatic workspace switch if storyboard workspace does not match current', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      agentChatService.selectedSessionId.set('session-123');
+
+      const mockResponse = {
+        session: {id: 'session-123', events: []},
+        storyboard: {id: 202, workspace_id: 2, timeline_id: 42},
+      };
+      agentChatService.getSessionDetail.and.returnValue(
+        of(mockResponse as any),
+      );
+
+      component['loadSessionDetail'](1, 10, 'session-123', 202);
+
+      expect(workspaceState.setActiveWorkspaceId).toHaveBeenCalledWith(2);
+      expect(component['isProgrammaticWorkspaceSwitch']).toBeTrue();
+    });
+
+    it('should handle error when preloading workspace state in loadSessionDetail', () => {
+      const errorObj = {status: 500, message: 'Internal Server Error'};
+      agentChatService.getSessionDetail.and.returnValue(
+        throwError(() => errorObj),
+      );
+      agentChatService.selectedSessionId.set('session-123');
+      spyOn(console, 'error');
+
+      component['loadSessionDetail'](1, 10, 'session-123', 202);
+
+      expect(console.error).toHaveBeenCalled();
+      expect(component.isLoadingHistory()).toBeFalse();
+    });
+
+    it('should handle status 503 error when loading chat messages', () => {
+      const errorObj = {status: 503, message: 'Service Unavailable'};
+      agentChatService.getSessionDetail.and.returnValue(
+        throwError(() => errorObj),
+      );
+      spyOn(console, 'error');
+
+      component.loadChatMessages('session-123');
+
+      expect(component.agentUnavailable()).toBeTrue();
+      expect(component.isLoadingHistory()).toBeFalse();
+    });
+
+    it('should handle status 503 error in SSE stream onError', () => {
+      component.currentSessionId = 'session-123';
+      component.sendChatMessage('hello');
+
+      spyOn(console, 'warn');
+      sseCallbacks.onError({status: 503, message: 'Service Unavailable'});
+
+      expect(component.agentUnavailable()).toBeTrue();
+      expect(component.isTyping()).toBeFalse();
+    });
+
+    it('should handle other error in SSE stream onError', () => {
+      const notificationService = TestBed.inject(NotificationService) as any;
+      spyOn(notificationService, 'show');
+      component.currentSessionId = 'session-123';
+      component.sendChatMessage('hello');
+
+      sseCallbacks.onError({status: 500, message: 'Internal Server Error'});
+
+      expect(component.agentUnavailable()).toBeFalse();
+      expect(component.isTyping()).toBeFalse();
+      expect(notificationService.show).toHaveBeenCalled();
+    });
+  });
+
+  describe('Storyboard Session Sync Effect', () => {
+    it('should sync selectedSessionId if storyboard session_id changes and is different', () => {
+      component.currentSessionId = 'session-123';
+      agentChatService.selectedSessionId.set('session-123');
+
+      agentChatService.currentStoryboard.set({
+        id: 202,
+        session_id: 'session-999',
+        timeline_id: 42,
+      } as any);
+      fixture.detectChanges();
+
+      expect(agentChatService.selectedSessionId()).toBe('session-999');
+    });
+  });
+
+  describe('Resolve Message Images Effect', () => {
+    let galleryService: any;
+
+    beforeEach(() => {
+      galleryService = TestBed.inject(GalleryService);
+    });
+
+    it('should resolve presigned urls for media items', () => {
+      const mockMedia = {
+        presignedUrls: ['http://media-url'],
+        presignedThumbnailUrls: ['http://thumb-url'],
+      };
+      galleryService.getMedia.and.returnValue(of(mockMedia));
+
+      component.chatMessages.set([
+        {
+          sender: 'user',
+          text: 'Hello',
+          images: [
+            {
+              mediaItem: {
+                id: 456,
+              },
+            },
+          ],
+        },
+      ]);
+      fixture.detectChanges();
+
+      expect(galleryService.getMedia).toHaveBeenCalledWith(456);
+      const messages = component.chatMessages();
+      expect(messages[0].images[0].mediaItem.presignedUrls).toEqual([
+        'http://media-url',
+      ]);
+    });
+
+    it('should resolve presigned urls for source assets', () => {
+      const mockAsset = {
+        presignedUrls: ['http://asset-url'],
+        presignedThumbnailUrls: ['http://asset-thumb-url'],
+      };
+      galleryService.getAsset.and.returnValue(of(mockAsset));
+
+      component.chatMessages.set([
+        {
+          sender: 'user',
+          text: 'Hello',
+          images: [
+            {
+              id: 789,
+            },
+          ],
+        },
+      ]);
+      fixture.detectChanges();
+
+      expect(galleryService.getAsset).toHaveBeenCalledWith(789);
+      const messages = component.chatMessages();
+      expect(messages[0].images[0].presignedUrl).toBe('http://asset-url');
+    });
+
+    it('should clean up resolvingAssetIds on media resolve error', () => {
+      galleryService.getMedia.and.returnValue(
+        throwError(() => new Error('Failed')),
+      );
+      spyOn(console, 'error');
+
+      component.chatMessages.set([
+        {
+          sender: 'user',
+          text: 'Hello',
+          images: [
+            {
+              mediaItem: {
+                id: 456,
+              },
+            },
+          ],
+        },
+      ]);
+      fixture.detectChanges();
+
+      expect(console.error).toHaveBeenCalled();
+      expect(component['resolvingAssetIds'].has('456')).toBeFalse();
+    });
+
+    it('should clean up resolvingAssetIds on asset resolve error', () => {
+      galleryService.getAsset.and.returnValue(
+        throwError(() => new Error('Failed')),
+      );
+      spyOn(console, 'error');
+
+      component.chatMessages.set([
+        {
+          sender: 'user',
+          text: 'Hello',
+          images: [
+            {
+              id: 789,
+            },
+          ],
+        },
+      ]);
+      fixture.detectChanges();
+
+      expect(console.error).toHaveBeenCalled();
+      expect(component['resolvingAssetIds'].has('789')).toBeFalse();
+    });
+  });
+
+  describe('Additional Chat Interface Coverage Tests', () => {
+    it('should get activeAgent via currentAgent getter', () => {
+      agentChatService.activeAgent.set('director');
+      expect(component.currentAgent).toBe('director');
+    });
+
+    it('should format links using markdownService.renderer.link', () => {
+      const markdownService = TestBed.inject(MarkdownService);
+
+      const result1 = (markdownService.renderer.link as any)({
+        href: 'http://test',
+        title: 'My Title',
+        text: 'Click Here',
+      });
+      expect(result1).toContain('href="http://test"');
+      expect(result1).toContain('title="My Title"');
+      expect(result1).toContain('Click Here');
+
+      const result2 = markdownService.renderer.link(
+        'http://test2',
+        'My Title 2',
+        'Click Here 2',
+      );
+      expect(result2).toContain('href="http://test2"');
+      expect(result2).toContain('title="My Title 2"');
+      expect(result2).toContain('Click Here 2');
+    });
+
+    it('should reset chat and timeline when workspace or project changes non-programmatically', () => {
+      const timelineState = TestBed.inject(TimelineStateService);
+      timelineState.loadedTimelineId.set(123);
+      component['lastWorkspaceId'] = 1;
+      component['lastProjectId'] = 10;
+      component['isProgrammaticWorkspaceSwitch'] = false;
+
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(2);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+      agentChatService.selectedSessionId.set('session-123');
+
+      component.loadChatSessions();
+
+      expect(timelineState.loadedTimelineId()).toBeUndefined();
+      expect(component.currentSessionId).toBeNull();
+    });
+
+    it('should consume and reset isProgrammaticWorkspaceSwitch when workspace changes programmatically', () => {
+      const timelineState = TestBed.inject(TimelineStateService);
+      timelineState.loadedTimelineId.set(123);
+      component['lastWorkspaceId'] = 1;
+      component['lastProjectId'] = 10;
+      component['isProgrammaticWorkspaceSwitch'] = true;
+
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(2);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+      agentChatService.selectedSessionId.set('session-123');
+
+      component.loadChatSessions();
+
+      expect(component['isProgrammaticWorkspaceSwitch']).toBeFalse();
+      expect(timelineState.loadedTimelineId()).toBe(123);
+    });
+
+    it('should handle session switch to null/new chat inside loadChatSessions', () => {
+      component['lastLoadedProjectId'] = 10;
+      component['lastLoadedWorkspaceId'] = 1;
+      component['lastLoadedSessionId'] = 'session-123';
+
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      agentChatService.selectedSessionId.set(null);
+      agentChatService.currentStoryboard.set(null);
+
+      spyOn(component, 'startNewChat');
+
+      component.loadChatSessions();
+
+      expect(component.isLoadingHistory()).toBeFalse();
+      expect(component.startNewChat).toHaveBeenCalled();
+    });
+
+    it('should handle explicit new chat when session history exists', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      agentChatService.selectedSessionId.set(null);
+      agentChatService.currentStoryboard.set(null);
+
+      component.sessions.set([
+        {
+          id: 'session-1',
+          name: 'Session 1',
+        } as any,
+      ]);
+
+      component.loadChatSessions();
+
+      expect(component.isLoadingHistory()).toBeFalse();
+    });
+
+    it('should handle loadSessionDetail where storyboard is present but session is not', () => {
+      const mockResponse = {
+        session: null,
+        storyboard: {id: 202, workspace_id: 1, timeline_id: 42},
+      };
+      agentChatService.getSessionDetail.and.returnValue(
+        of(mockResponse as any),
+      );
+      agentChatService.selectedSessionId.set('session-123');
+
+      component['loadSessionDetail'](1, 10, 'session-123', 202);
+
+      expect(component.currentSessionId).toBeNull();
+      expect(agentChatService.selectedSessionId()).toBeNull();
+    });
+
+    it('should call startNewChat if getSessionDetail response has neither session nor storyboard', () => {
+      const mockResponse = {
+        session: null,
+        storyboard: null,
+      };
+      agentChatService.getSessionDetail.and.returnValue(
+        of(mockResponse as any),
+      );
+      agentChatService.selectedSessionId.set('session-123');
+      spyOn(component, 'startNewChat');
+
+      component['loadSessionDetail'](1, 10, 'session-123', 202);
+
+      expect(component.startNewChat).toHaveBeenCalled();
+    });
+  });
+
+  describe('mapEventsToMessages parsing details', () => {
+    it('should parse source_asset and media_item tags from System Note', () => {
+      const mockEvents = [
+        {
+          author: 'model',
+          content: {
+            role: 'model',
+            parts: [
+              {
+                text: 'Here is an asset: [System Note: <creative_studio_asset id="123" type="source_asset" />]',
+              },
+              {
+                text: 'Here is a media item: [System Note: <creative_studio_asset id="456" type="media_item" />]',
+              },
+            ],
+          },
+        },
+      ];
+
+      const mapped = component['mapEventsToMessages'](mockEvents);
+
+      expect(mapped[0].images).toEqual([
+        {id: 123},
+        {
+          mediaItem: {
+            id: 456,
+          },
+        },
+      ]);
+    });
+
+    it('should handle functionResponse with clips and assets', () => {
+      spyOn(agentChatService.videoGenerated$, 'next');
+      const mockEvents = [
+        {
+          author: 'model',
+          content: {
+            parts: [
+              {
+                functionResponse: {
+                  response: {
+                    result: JSON.stringify({
+                      clips: [{id: 1}],
+                      assets: [{id: 2}],
+                    }),
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ];
+
+      const mapped = component['mapEventsToMessages'](mockEvents);
+
+      expect(agentChatService.videoGenerated$.next).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          clips: [{id: 1}],
+          assets: [{id: 2}],
+        }),
+      );
+    });
+
+    it('should parse storyboard actions and extract storyboard data', () => {
+      const mockEvents = [
+        {
+          author: 'model',
+          actions: {
+            storyboard: {
+              scenes: [{id: 1, description: 'Test Scene'}],
+            },
+          },
+          content: {
+            parts: [],
+          },
+        },
+      ];
+
+      const mapped = component['mapEventsToMessages'](mockEvents);
+
+      expect(mapped[0].storyboard).toEqual(
+        jasmine.objectContaining({
+          scenes: [{id: 1, description: 'Test Scene'}],
+        }),
+      );
+    });
+  });
+
+  describe('setupCallbacks SSE stream details', () => {
+    beforeEach(() => {
+      component.currentSessionId = 'session-123';
+      component.sendChatMessage('hello');
+    });
+
+    it('should parse JSON block start in onMessage text parts', () => {
+      sseCallbacks.onMessage({
+        id: 'inv-1',
+        content: {
+          parts: [{text: 'Preamble text {\n "scenes": []'}],
+        },
+      });
+
+      const messages = component.chatMessages();
+      expect(messages.length).toBe(4);
+      expect(messages[2].text).toBe('Preamble text ');
+      expect(messages[3].text).toBe('{\n "scenes": []');
+      expect(messages[3].isHidden).toBeTrue();
+    });
+
+    it('should append to last hidden message when in json block', () => {
+      sseCallbacks.onMessage({
+        id: 'inv-1',
+        content: {
+          parts: [{text: '{\n'}],
+        },
+      });
+
+      sseCallbacks.onMessage({
+        id: 'inv-1',
+        content: {
+          parts: [{text: '"campaign_name": "Test Campaign"'}],
+        },
+      });
+
+      const messages = component.chatMessages();
+      expect(messages[messages.length - 1].text).toBe(
+        '{\n"campaign_name": "Test Campaign"',
+      );
+    });
+
+    it('should handle functionResponse for video asset and trigger workbench broadcast', () => {
+      spyOn(agentChatService.videoGenerated$, 'next');
+
+      sseCallbacks.onMessage({
+        id: 'inv-1',
+        content: {
+          parts: [
+            {
+              functionResponse: {
+                response: {
+                  result: JSON.stringify({
+                    asset: {
+                      id: 'vid-123',
+                      type: 'video',
+                    },
+                  }),
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      const messages = component.chatMessages();
+      expect(messages[messages.length - 1].asset).toEqual({
+        id: 'vid-123',
+        type: 'video',
+      });
+      expect(agentChatService.videoGenerated$.next).toHaveBeenCalledWith(
+        jasmine.objectContaining({id: 'vid-123', type: 'video'}),
+      );
+    });
+
+    it('should handle functionResponse for storyboard_id, fetch storyboard and reset timeline', () => {
+      (storyboardService.getStoryboard as jasmine.Spy).and.returnValue(
+        of({
+          id: 202,
+          timeline_id: 42,
+        }),
+      );
+      const timelineState = TestBed.inject(TimelineStateService);
+      timelineState.loadedTimelineId.set(123);
+
+      sseCallbacks.onMessage({
+        id: 'inv-1',
+        content: {
+          parts: [
+            {
+              functionResponse: {
+                response: {
+                  result: JSON.stringify({
+                    storyboard_id: 202,
+                  }),
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      expect(storyboardService.getStoryboard).toHaveBeenCalledWith(202);
+      expect(timelineState.loadedTimelineId()).toBeUndefined();
+      expect(agentChatService.currentStoryboard()).toEqual(
+        jasmine.objectContaining({id: 202, timeline_id: 42}),
+      );
+    });
+
+    it('should handle onClose, parsing assets and fetching storyboard for session', () => {
+      (
+        storyboardService.getStoryboardForSession as jasmine.Spy
+      ).and.returnValue(
+        of([
+          {
+            id: 303,
+            timeline_id: 12,
+          },
+        ]),
+      );
+
+      const timelineState = TestBed.inject(TimelineStateService);
+      timelineState.loadedTimelineId.set(123);
+
+      sseCallbacks.onMessage({
+        id: 'inv-1',
+        content: {
+          parts: [
+            {
+              text: 'Generation complete: ```json\n{"asset": {"id": "v-123", "type": "video"}}\n```',
+            },
+          ],
+        },
+      });
+
+      sseCallbacks.onClose();
+
+      expect(timelineState.loadedTimelineId()).toBeUndefined();
+      expect(agentChatService.currentStoryboard()).toEqual(
+        jasmine.objectContaining({id: 303, timeline_id: 12}),
+      );
+      expect(storyboardService.getStoryboardForSession).toHaveBeenCalledWith(
+        1,
+        'session-123',
+      );
+    });
+    it('should handle onClose when storyboard fetch returns error', () => {
+      (
+        storyboardService.getStoryboardForSession as jasmine.Spy
+      ).and.returnValue(throwError(() => new Error('Storyboard error')));
+      spyOn(console, 'error');
+
+      sseCallbacks.onClose();
+
+      expect(console.error).toHaveBeenCalled();
+    });
+
+    it('should handle onClose when storyboard has no timeline_id', () => {
+      spyOn(agentChatService.videoGenerated$, 'next');
+      (
+        storyboardService.getStoryboardForSession as jasmine.Spy
+      ).and.returnValue(
+        of([
+          {
+            id: 303,
+            timeline_id: null,
+          },
+        ]),
+      );
+
+      const timelineState = TestBed.inject(TimelineStateService);
+      timelineState.loadedTimelineId.set(123);
+
+      sseCallbacks.onClose();
+
+      expect(timelineState.loadedTimelineId()).toBe(123);
+      expect(agentChatService.videoGenerated$.next).not.toHaveBeenCalledWith(
+        true,
+      );
+    });
+
+    it('should handle onClose when storyboard list is empty', () => {
+      spyOn(agentChatService.videoGenerated$, 'next');
+      (
+        storyboardService.getStoryboardForSession as jasmine.Spy
+      ).and.returnValue(of([]));
+
+      sseCallbacks.onClose();
+
+      expect(agentChatService.videoGenerated$.next).toHaveBeenCalledWith(true);
+    });
+
+    it('should handle functionResponse for storyboard_id error when fetching storyboard', () => {
+      (storyboardService.getStoryboard as jasmine.Spy).and.returnValue(
+        throwError(() => new Error('Storyboard load failed')),
+      );
+      spyOn(console, 'error');
+
+      sseCallbacks.onMessage({
+        id: 'inv-1',
+        content: {
+          parts: [
+            {
+              functionResponse: {
+                response: {
+                  result: JSON.stringify({
+                    storyboard_id: 202,
+                  }),
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      expect(console.error).toHaveBeenCalled();
+    });
+
+    it('should call videoGenerated.next(true) in onClose if currentSessionId is missing', () => {
+      spyOn(agentChatService.videoGenerated$, 'next');
+      component.currentSessionId = null;
+
+      sseCallbacks.onClose();
+
+      expect(agentChatService.videoGenerated$.next).toHaveBeenCalledWith(true);
+    });
+
+    it('should handle functionResponse with clips and assets in setupCallbacks', () => {
+      spyOn(agentChatService.videoGenerated$, 'next');
+
+      sseCallbacks.onMessage({
+        id: 'inv-1',
+        content: {
+          parts: [
+            {
+              functionResponse: {
+                response: {
+                  result: JSON.stringify({
+                    clips: [{id: 1}],
+                    assets: [{id: 2}],
+                  }),
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      expect(component.isTyping()).toBeFalse();
+      expect(agentChatService.videoGenerated$.next).toHaveBeenCalledWith(
+        jasmine.objectContaining({
+          clips: [{id: 1}],
+          assets: [{id: 2}],
+        }),
+      );
+    });
+
+    it('should set isGeneratingStoryboard and isTyping to false onMessage with actions.storyboard', () => {
+      component.isTyping.set(true);
+      agentChatService.isGeneratingStoryboard.set(true);
+
+      sseCallbacks.onMessage({
+        actions: {
+          storyboard: {scenes: []},
+        },
+      });
+
+      expect(component.isTyping()).toBeFalse();
+      expect(agentChatService.isGeneratingStoryboard()).toBeFalse();
+    });
+  });
+
+  describe('loadChatSessions error and parameter checks', () => {
+    it('should return early in loadChatSessions if active workspace ID is not set', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(
+        null,
+      );
+      (agentChatService.getSessions as jasmine.Spy).calls.reset();
+
+      component.loadChatSessions();
+
+      expect(agentChatService.getSessions).not.toHaveBeenCalled();
+    });
+
+    it('should handle preload state failure with non-503 status', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      agentChatService.getSessions.and.returnValue(
+        throwError(() => ({status: 500, message: 'Internal Server Error'})),
+      );
+      component.loadChatSessions();
+
+      expect(component.agentUnavailable()).toBeFalse();
+    });
+
+    it('should call resumePolling and startPolling if session state is RUNNING', () => {
+      const mockResponse = {
+        session: {
+          id: 'session-123',
+          state: {
+            status: 'RUNNING',
+          },
+          events: [
+            {
+              author: 'user',
+              content: {
+                parts: [{text: 'Hello'}],
+              },
+            },
+          ],
+        },
+        storyboard: null,
+      };
+      agentChatService.getSessionDetail.and.returnValue(
+        of(mockResponse as any),
+      );
+      agentChatService.selectedSessionId.set('session-123');
+
+      component['loadSessionDetail'](1, 10, 'session-123', null);
+
+      expect(component.isTyping()).toBeTrue();
+      expect(agentChatService.startPolling).toHaveBeenCalledWith(
+        'session-123',
+        jasmine.any(Object),
+      );
+    });
+
+    it('should return early in loadChatSessions if explicit new chat', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      component.sessions.set([{id: 'session-1', name: 'Session 1'}]);
+      component.currentSessionId = null;
+
+      (agentChatService.getSessions as jasmine.Spy).calls.reset();
+
+      component['lastLoadedProjectId'] = null;
+      component['lastLoadedWorkspaceId'] = null;
+      component.loadChatSessions();
+
+      expect(agentChatService.getSessions).not.toHaveBeenCalled();
+      expect(component.isLoadingHistory()).toBeFalse();
+    });
+
+    it('should handle preload state failure with 503 status in getSessions', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      agentChatService.getSessions.and.returnValue(
+        throwError(() => ({status: 503, message: 'Service Unavailable'})),
+      );
+      component['lastLoadedProjectId'] = null;
+      component['lastLoadedWorkspaceId'] = null;
+      component.loadChatSessions();
+
+      expect(component.agentUnavailable()).toBeTrue();
+    });
+
+    it('should return early in getSessions subscribe if active workspace changes during fetch', fakeAsync(() => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      agentChatService.getSessions.and.returnValue(
+        of([
+          {
+            id: 'session-1',
+            title: 'Session 1',
+            workspace_id: 1,
+            project_id: 10,
+          },
+        ]).pipe(delay(100)),
+      );
+
+      component['lastLoadedProjectId'] = null;
+      component['lastLoadedWorkspaceId'] = null;
+      component.loadChatSessions();
+
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(2);
+
+      tick(100);
+
+      expect(component.sessions()).toEqual([]);
+    }));
+
+    it('should load default session if requested session does not exist in workspace, but workspace has other sessions', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      agentChatService.selectedSessionId.set('session-requested');
+
+      const mockSessions = [{id: 'session-default', name: 'Newest Session'}];
+      agentChatService.getSessions.and.returnValue(of(mockSessions));
+      spyOn(component as any, 'loadSessionDetail');
+
+      component['lastLoadedProjectId'] = null;
+      component['lastLoadedWorkspaceId'] = null;
+      component.loadChatSessions();
+
+      expect(component['loadSessionDetail']).toHaveBeenCalledWith(
+        1,
+        10,
+        'session-default',
+        null,
+      );
+    });
+
+    it('should start new chat if requested session does not exist in workspace, and workspace has no other sessions', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      agentChatService.selectedSessionId.set('session-requested');
+
+      agentChatService.getSessions.and.returnValue(of([]));
+      spyOn(component, 'startNewChat');
+
+      component['lastLoadedProjectId'] = null;
+      component['lastLoadedWorkspaceId'] = null;
+      component.loadChatSessions();
+
+      expect(component.isLoadingHistory()).toBeFalse();
+      expect(component.startNewChat).toHaveBeenCalled();
+    });
+  });
+
+  describe('loadSessionDetail error handling', () => {
+    it('should handle getSessionDetail error and reset state', () => {
+      agentChatService.getSessionDetail.and.returnValue(
+        throwError(() => new Error('Failed to load session details')),
+      );
+      spyOn(component as any, 'resetLastLoaded').and.callThrough();
+
+      component['loadSessionDetail'](1, 10, 'session-123', null);
+
+      expect(component.isLoadingHistory()).toBeFalse();
+      expect(component['resetLastLoaded']).toHaveBeenCalled();
+    });
+
+    it('should add welcome message if loaded session detail has no messages', () => {
+      const mockResponse = {
+        session: {
+          id: 'session-123',
+          events: [],
+        },
+        storyboard: null,
+      };
+      agentChatService.getSessionDetail.and.returnValue(
+        of(mockResponse as any),
+      );
+      agentChatService.selectedSessionId.set('session-123');
+
+      spyOn(component, 'addWelcomeMessage').and.callThrough();
+
+      component['loadSessionDetail'](1, 10, 'session-123', null);
+
+      expect(component.addWelcomeMessage).toHaveBeenCalled();
+      expect(component.chatMessages().length).toBeGreaterThan(0);
+    });
+
+    it('should reset session and add welcome message if response only contains storyboard', () => {
+      const mockResponse = {
+        session: null,
+        storyboard: {id: 'storyboard-123', workspace_id: 1, scenes: []},
+      };
+      agentChatService.getSessionDetail.and.returnValue(
+        of(mockResponse as any),
+      );
+      agentChatService.selectedSessionId.set('session-123');
+
+      spyOn(component, 'addWelcomeMessage').and.callThrough();
+
+      component['loadSessionDetail'](1, 10, 'session-123', null);
+
+      expect(component.currentSessionId).toBeNull();
+      expect(component.addWelcomeMessage).toHaveBeenCalled();
+    });
+  });
+
+  describe('viewAsset', () => {
+    beforeEach(() => {
+      spyOn(window, 'open');
+    });
+
+    it('should open gallery route by default', () => {
+      component.viewAsset('asset-123');
+      expect(window.open).toHaveBeenCalledWith('/gallery/asset-123', '_blank');
+    });
+
+    it('should open asset-detail route for source_asset type', () => {
+      component.viewAsset('source_asset:123');
+      expect(window.open).toHaveBeenCalledWith('/asset-detail/123', '_blank');
+    });
+
+    it('should open gallery route for media_item type', () => {
+      component.viewAsset('media_item:456');
+      expect(window.open).toHaveBeenCalledWith('/gallery/456', '_blank');
+    });
+  });
+
+  describe('deleteChat', () => {
+    let mockDialog: any;
+    let mockDialogRef: any;
+
+    beforeEach(() => {
+      mockDialogRef = {
+        afterClosed: jasmine.createSpy('afterClosed').and.returnValue(of(true)),
+      };
+      mockDialog = TestBed.inject(MatDialog);
+      spyOn(mockDialog, 'open').and.returnValue(mockDialogRef);
+    });
+
+    it('should open dialog and delete session if confirmed', () => {
+      component.currentSessionId = 'session-123';
+      agentChatService.deleteSession.and.returnValue(of(null));
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+
+      spyOn(component, 'startNewChat');
+
+      component.deleteChat();
+
+      expect(mockDialog.open).toHaveBeenCalled();
+      expect(agentChatService.deleteSession).toHaveBeenCalledWith(
+        'session-123',
+        1,
+      );
+      expect(component.startNewChat).toHaveBeenCalled();
+    });
+
+    it('should do nothing if dialog is cancelled', () => {
+      component.currentSessionId = 'session-123';
+      mockDialogRef.afterClosed.and.returnValue(of(false));
+
+      component.deleteChat();
+
+      expect(mockDialog.open).toHaveBeenCalled();
+      expect(agentChatService.deleteSession).not.toHaveBeenCalled();
+    });
+
+    it('should return early if currentSessionId is not set', () => {
+      component.currentSessionId = null;
+
+      component.deleteChat();
+
+      expect(mockDialog.open).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onAgentChange & onSessionChange', () => {
+    it('should update activeAgent and reload sessions onAgentChange', () => {
+      spyOn(component, 'loadChatSessions');
+      component.onAgentChange('agent-456');
+
+      expect(agentChatService.activeAgent()).toBe('agent-456');
+      expect(component.currentSessionId).toBeNull();
+      expect(component.loadChatSessions).toHaveBeenCalled();
+    });
+
+    it('should load messages if session changes', () => {
+      spyOn(component, 'loadChatMessages');
+      component.currentSessionId = 'session-1';
+      component.onSessionChange('session-2');
+
+      expect(component.currentSessionId).toBe('session-2');
+      expect(component.loadChatMessages).toHaveBeenCalledWith('session-2');
+    });
+  });
+
+  describe('sendChatMessage title generation and session creation errors', () => {
+    beforeEach(() => {
+      component.currentSessionId = null;
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+    });
+
+    it('should fall back to default session name if generateTitle fails and createSession succeeds', () => {
+      agentChatService.generateTitle.and.returnValue(
+        throwError(() => new Error('Title error')),
+      );
+      agentChatService.createSession.and.returnValue(
+        of({
+          id: 'session-default',
+          title: 'New Session',
+          workspace_id: 1,
+          project_id: 10,
+        }),
+      );
+      spyOn(component as any, 'executeSendMessage');
+
+      component.sendChatMessage('test message');
+
+      expect(agentChatService.createSession).toHaveBeenCalledWith(
+        1,
+        10,
+        'New Session',
+      );
+      expect((component as any).executeSendMessage).toHaveBeenCalledWith(
+        'test message',
+      );
+    });
+
+    it('should handle error when createSession fails after generateTitle succeeds', () => {
+      agentChatService.generateTitle.and.returnValue(
+        of({title: 'Generated Title'}),
+      );
+      agentChatService.createSession.and.returnValue(
+        throwError(() => new Error('Session creation error')),
+      );
+      spyOn(console, 'error');
+
+      component.sendChatMessage('test message');
+
+      expect(component.isTyping()).toBeFalse();
+      expect(console.error).toHaveBeenCalled();
+    });
+
+    it('should handle error when createSession fails after generateTitle fails', () => {
+      agentChatService.generateTitle.and.returnValue(
+        throwError(() => new Error('Title error')),
+      );
+      agentChatService.createSession.and.returnValue(
+        throwError(() => new Error('Session creation error')),
+      );
+
+      component.sendChatMessage('test message');
+
+      expect(component.isTyping()).toBeFalse();
+    });
+  });
+
+  describe('hasPendingToolCall, isToolResponse, and detectActiveToolCall branches', () => {
+    it('should return false for hasPendingToolCall and isToolResponse if event is null', () => {
+      expect(component['hasPendingToolCall'](null)).toBeFalse();
+      expect(component['isToolResponse'](null)).toBeFalse();
+    });
+
+    it('should detect functionCall variants in hasPendingToolCall', () => {
+      expect(
+        component['hasPendingToolCall']({
+          content: {parts: [{functionCall: {}}]},
+        }),
+      ).toBeTrue();
+      expect(
+        component['hasPendingToolCall']({
+          content: {parts: [{function_call: {}}]},
+        }),
+      ).toBeTrue();
+      expect(
+        component['hasPendingToolCall']({content: {parts: [{toolCall: {}}]}}),
+      ).toBeTrue();
+      expect(
+        component['hasPendingToolCall']({content: {parts: [{tool_call: {}}]}}),
+      ).toBeTrue();
+    });
+
+    it('should detect functionCall variants in raw_event hasPendingToolCall', () => {
+      expect(
+        component['hasPendingToolCall']({
+          raw_event: {content: {parts: [{functionCall: {}}]}},
+        }),
+      ).toBeTrue();
+      expect(
+        component['hasPendingToolCall']({
+          raw_event: {content: {parts: [{function_call: {}}]}},
+        }),
+      ).toBeTrue();
+      expect(
+        component['hasPendingToolCall']({
+          raw_event: {content: {parts: [{toolCall: {}}]}},
+        }),
+      ).toBeTrue();
+      expect(
+        component['hasPendingToolCall']({
+          raw_event: {content: {parts: [{tool_call: {}}]}},
+        }),
+      ).toBeTrue();
+    });
+
+    it('should return false if no functionCall variants in hasPendingToolCall', () => {
+      expect(
+        component['hasPendingToolCall']({content: {parts: [{text: 'hello'}]}}),
+      ).toBeFalse();
+    });
+
+    it('should detect functionResponse variants in isToolResponse', () => {
+      expect(
+        component['isToolResponse']({
+          content: {parts: [{functionResponse: {}}]},
+        }),
+      ).toBeTrue();
+      expect(
+        component['isToolResponse']({
+          content: {parts: [{function_response: {}}]},
+        }),
+      ).toBeTrue();
+      expect(
+        component['isToolResponse']({content: {parts: [{toolResponse: {}}]}}),
+      ).toBeTrue();
+      expect(
+        component['isToolResponse']({content: {parts: [{tool_response: {}}]}}),
+      ).toBeTrue();
+    });
+
+    it('should detect functionResponse variants in raw_event isToolResponse', () => {
+      expect(
+        component['isToolResponse']({
+          raw_event: {content: {parts: [{functionResponse: {}}]}},
+        }),
+      ).toBeTrue();
+      expect(
+        component['isToolResponse']({
+          raw_event: {content: {parts: [{function_response: {}}]}},
+        }),
+      ).toBeTrue();
+      expect(
+        component['isToolResponse']({
+          raw_event: {content: {parts: [{toolResponse: {}}]}},
+        }),
+      ).toBeTrue();
+      expect(
+        component['isToolResponse']({
+          raw_event: {content: {parts: [{tool_response: {}}]}},
+        }),
+      ).toBeTrue();
+    });
+
+    it('should return early in detectActiveToolCall if data is null', () => {
+      expect(() => component['detectActiveToolCall'](null)).not.toThrow();
+    });
+
+    it('should set isGeneratingStoryboard if functionCall contains storyboard or timeline name', () => {
+      component['detectActiveToolCall']({
+        content: {parts: [{functionCall: {name: 'generate_storyboard'}}]},
+      });
+      expect(agentChatService.isGeneratingStoryboard()).toBeTrue();
+
+      agentChatService.isGeneratingStoryboard.set(false);
+      component['detectActiveToolCall']({
+        content: {parts: [{functionCall: {name: 'render_timeline'}}]},
+      });
+      expect(agentChatService.isGeneratingStoryboard()).toBeTrue();
+    });
+
+    it('should set isGeneratingVideo if functionCall contains video, render or stitch name', () => {
+      component['detectActiveToolCall']({
+        content: {parts: [{functionCall: {name: 'generate_video'}}]},
+      });
+      expect(agentChatService.isGeneratingVideo()).toBeTrue();
+
+      agentChatService.isGeneratingVideo.set(false);
+      component['detectActiveToolCall']({
+        content: {parts: [{functionCall: {name: 'render_scene'}}]},
+      });
+      expect(agentChatService.isGeneratingVideo()).toBeTrue();
+
+      agentChatService.isGeneratingVideo.set(false);
+      component['detectActiveToolCall']({
+        content: {parts: [{functionCall: {name: 'stitch_clips'}}]},
+      });
+      expect(agentChatService.isGeneratingVideo()).toBeTrue();
+    });
+
+    it('should return early in checkAndResumePolling if lastUpdateTime is older than 20 minutes', () => {
+      spyOn(component as any, 'resumePolling');
+      const oldTime = Date.now() / 1000 - 1500;
+      const mockRes = {
+        session: {
+          id: 'session-old',
+          lastUpdateTime: oldTime,
+          events: [
+            {
+              author: 'user',
+              content: {
+                parts: [{text: 'hello'}],
+              },
+            },
+          ],
+        },
+      };
+
+      component.checkAndResumePolling(mockRes as any);
+
+      expect(component['resumePolling']).not.toHaveBeenCalled();
+    });
+
+    it('should call detectActiveToolCall in checkAndResumePolling if last event has pending tool call', () => {
+      spyOn(component as any, 'detectActiveToolCall');
+      spyOn(component as any, 'resumePolling');
+      const mockRes = {
+        session: {
+          id: 'session-tool',
+          events: [
+            {
+              author: 'model',
+              content: {
+                parts: [{functionCall: {name: 'generate_storyboard'}}],
+              },
+            },
+          ],
+        },
+      };
+
+      component.checkAndResumePolling(mockRes as any);
+
+      expect(component['detectActiveToolCall']).toHaveBeenCalled();
+      expect(component['resumePolling']).toHaveBeenCalledWith('session-tool');
+    });
+  });
+
+  describe('mapEventsToMessages additional branches', () => {
+    it('should map event actions.storyboard to storyboard metadata', () => {
+      const mockStoryboard = {
+        id: 123,
+        scenes: [{id: 1, description: 'Test Scene'}],
+      };
+      spyOn(component as any, 'extractStoryboardData').and.returnValue(
+        mockStoryboard,
+      );
+
+      const events = [
+        {
+          author: 'model',
+          actions: {
+            storyboard: {scenes: [{id: 1, description: 'Test Scene'}]},
+          },
+          content: {parts: []},
+        },
+      ];
+
+      const mapped = component['mapEventsToMessages'](events);
+
+      expect(mapped[0].storyboard).toEqual(mockStoryboard);
+    });
+  });
+
+  describe('executeSendMessage additional callbacks coverage', () => {
+    it('should handle actions.storyboard inside executeSendMessage onMessage callback', () => {
+      component.currentSessionId = 'session-123';
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      component.sendChatMessage('hello test message');
+
+      expect(agentChatService.sendMessage).toHaveBeenCalled();
+
+      component.isTyping.set(true);
+      agentChatService.isGeneratingStoryboard.set(true);
+      agentChatService.isGeneratingVideo.set(true);
+
+      sseCallbacks.onMessage({
+        actions: {
+          storyboard: {scenes: []},
+        },
+      });
+
+      expect(component.isTyping()).toBeFalse();
+      expect(agentChatService.isGeneratingStoryboard()).toBeFalse();
+      expect(agentChatService.isGeneratingVideo()).toBeFalse();
+    });
+
+    it('should return early in sendChatMessage if text is empty and no images are selected', () => {
+      (agentChatService.sendMessage as jasmine.Spy).calls.reset();
+      component.sendChatMessage('');
+      expect(agentChatService.sendMessage).not.toHaveBeenCalled();
+
+      component.sendChatMessage('   ');
+      expect(agentChatService.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('should handle json blocks in streamed messages', () => {
+      component.currentSessionId = 'session-123';
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      component.sendChatMessage('hello');
+
+      sseCallbacks.onMessage({
+        content: {
+          parts: [{text: 'Here is some text {\n"key": "value"}'}],
+        },
+      });
+
+      sseCallbacks.onMessage({
+        content: {
+          parts: [{text: '}'}],
+        },
+      });
+
+      expect(component.chatMessages().length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('loadChatMessages error handling', () => {
+    it('should handle getSessionDetail 503 error in loadChatMessages', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      agentChatService.getSessionDetail.and.returnValue(
+        throwError(() => ({status: 503, message: 'Service Unavailable'})),
+      );
+
+      component.loadChatMessages('session-123');
+
+      expect(component.agentUnavailable()).toBeTrue();
+      expect(component.isLoadingHistory()).toBeFalse();
+    });
+
+    it('should handle getSessionDetail non-503 error in loadChatMessages', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      agentChatService.getSessionDetail.and.returnValue(
+        throwError(() => ({status: 500, message: 'Internal Server Error'})),
+      );
+
+      component.loadChatMessages('session-123');
+
+      expect(component.agentUnavailable()).toBeFalse();
+      expect(component.isLoadingHistory()).toBeFalse();
+    });
+  });
+
+  describe('setupCallbacks coverage', () => {
+    it('should invoke onError with 503 status and set agentUnavailable', () => {
+      const callbacks = component['setupCallbacks']();
+      component.isTyping.set(true);
+
+      callbacks.onError!({status: 503, message: 'Service Unavailable'});
+
+      expect(component.agentUnavailable()).toBeTrue();
+      expect(component.isTyping()).toBeFalse();
+    });
+
+    it('should invoke onError with non-503 status', () => {
+      const callbacks = component['setupCallbacks']();
+      component.isTyping.set(true);
+
+      callbacks.onError!({status: 500, message: 'Internal error'});
+
+      expect(component.agentUnavailable()).toBeFalse();
+      expect(component.isTyping()).toBeFalse();
+    });
+
+    it('should invoke onClose callback and reset generating states', () => {
+      const callbacks = component['setupCallbacks']();
+      component.isTyping.set(true);
+      agentChatService.isGeneratingStoryboard.set(true);
+      agentChatService.isGeneratingVideo.set(true);
+
+      callbacks.onClose!();
+
+      expect(component.isTyping()).toBeFalse();
+      expect(agentChatService.isGeneratingStoryboard()).toBeFalse();
+      expect(agentChatService.isGeneratingVideo()).toBeFalse();
+    });
+
+    describe('onMessage callback', () => {
+      let callbacks: SSECallbacks<any>;
+
+      beforeEach(() => {
+        callbacks = component['setupCallbacks']();
+        component.chatMessages.set([]);
+        component.isTyping.set(true);
+      });
+
+      it('should detect active tool call and handle actions.storyboard', () => {
+        spyOn(component as any, 'detectActiveToolCall');
+        callbacks.onMessage!({
+          actions: {storyboard: true},
+        });
+        expect(component['detectActiveToolCall']).toHaveBeenCalled();
+        expect(component.isTyping()).toBeFalse();
+        expect(agentChatService.isGeneratingStoryboard()).toBeFalse();
+        expect(agentChatService.isGeneratingVideo()).toBeFalse();
+      });
+
+      it('should handle new regular text chunk and update messages', () => {
+        callbacks.onMessage!({
+          id: 'inv-1',
+          content: {
+            parts: [{text: 'Hello part 1'}],
+          },
+        });
+        let messages = component.chatMessages();
+        expect(messages.length).toBe(1);
+        expect(messages[0].sender).toBe('agent');
+        expect(messages[0].text).toBe('Hello part 1');
+
+        // Second chunk from same invocation should append
+        callbacks.onMessage!({
+          id: 'inv-1',
+          content: {
+            parts: [{text: ' part 2'}],
+          },
+        });
+        messages = component.chatMessages();
+        expect(messages.length).toBe(1);
+        expect(messages[0].text).toBe('Hello part 1 part 2');
+
+        // New invocation ID should create a new message
+        callbacks.onMessage!({
+          id: 'inv-2',
+          content: {
+            parts: [{text: 'New message'}],
+          },
+        });
+        messages = component.chatMessages();
+        expect(messages.length).toBe(2);
+        expect(messages[1].text).toBe('New message');
+      });
+
+      it('should handle JSON chunks and mark them as hidden', () => {
+        callbacks.onMessage!({
+          id: 'inv-1',
+          content: {
+            parts: [{text: '{\n"scenes": []}'}],
+          },
+        });
+        const messages = component.chatMessages();
+        expect(messages.length).toBe(1);
+        expect(messages[0].isHidden).toBeTrue();
+        expect(messages[0].text).toBe('{\n"scenes": []}');
+      });
+
+      it('should process functionResponse containing asset and call videoGenerated next if it is a video', () => {
+        spyOn(agentChatService.videoGenerated$, 'next');
+        callbacks.onMessage!({
+          content: {
+            parts: [
+              {
+                functionResponse: {
+                  response: {
+                    result: JSON.stringify({
+                      asset: {id: 456, type: 'video'},
+                    }),
+                  },
+                },
+              },
+            ],
+          },
+        });
+        const messages = component.chatMessages();
+        expect(messages.length).toBe(1);
+        expect(messages[0].asset).toEqual({id: 456, type: 'video'});
+        expect(agentChatService.videoGenerated$.next).toHaveBeenCalledWith({
+          id: 456,
+          type: 'video',
+        });
+      });
+
+      it('should process functionResponse containing storyboard_id and fetch it', () => {
+        (storyboardService.getStoryboard as jasmine.Spy).and.returnValue(
+          of({id: 789, title: 'Fetched SB'}),
+        );
+        callbacks.onMessage!({
+          content: {
+            parts: [
+              {
+                functionResponse: {
+                  response: {
+                    result: JSON.stringify({
+                      storyboard_id: 789,
+                    }),
+                  },
+                },
+              },
+            ],
+          },
+        });
+        expect(storyboardService.getStoryboard).toHaveBeenCalledWith(789);
+        expect(agentChatService.currentStoryboard()).toEqual(
+          jasmine.objectContaining({id: 789}),
+        );
+      });
+    });
+  });
+
+  describe('loadChatMessages success paths', () => {
+    it('should set currentStoryboard if present in loadChatMessages success response', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      const mockResponse = {
+        session: {
+          id: 'session-123',
+          events: [],
+        },
+        storyboard: {id: 'storyboard-123', workspace_id: 1, scenes: []},
+      };
+      agentChatService.getSessionDetail.and.returnValue(
+        of(mockResponse as any),
+      );
+
+      component.loadChatMessages('session-123');
+
+      expect(agentChatService.currentStoryboard()).toEqual(
+        mockResponse.storyboard as any,
+      );
+      expect(component.isLoadingHistory()).toBeFalse();
+    });
+
+    it('should clear storyboard if not present in loadChatMessages success response', () => {
+      const workspaceState = TestBed.inject(WorkspaceStateService);
+      (workspaceState.getActiveWorkspaceId as jasmine.Spy).and.returnValue(1);
+      const projectState = TestBed.inject(ProjectStateService);
+      (projectState.getActiveProjectId as jasmine.Spy).and.returnValue(10);
+
+      const mockResponse = {
+        session: {
+          id: 'session-123',
+          events: [],
+        },
+        storyboard: null,
+      };
+      agentChatService.getSessionDetail.and.returnValue(
+        of(mockResponse as any),
+      );
+      agentChatService.currentStoryboard.set({
+        id: 'existing-storyboard',
+      } as any);
+
+      component.loadChatMessages('session-123');
+
+      expect(agentChatService.currentStoryboard()).toBeNull();
+      expect(component.isLoadingHistory()).toBeFalse();
     });
   });
 });

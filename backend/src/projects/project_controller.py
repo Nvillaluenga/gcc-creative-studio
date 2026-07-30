@@ -54,15 +54,11 @@ async def get_project(
     project_service: ProjectService = Depends(),
 ):
     if session_id is None and storyboard_id is None and timeline_id is None:
+        project = None
         if project_id.isdigit():
-            numeric_id = int(project_id)
             project = await project_service.get_project(
-                project_id=numeric_id,
-                storyboard_id=numeric_id,
-                timeline_id=numeric_id,
+                project_id=int(project_id)
             )
-        else:
-            project = await project_service.get_project(session_id=project_id)
     else:
         project = await project_service.get_project(
             session_id=session_id,

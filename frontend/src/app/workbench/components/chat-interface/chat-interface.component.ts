@@ -37,13 +37,9 @@ import {WorkspaceStateService} from '../../../services/workspace/workspace-state
 import {StoryboardService} from '../../../services/storyboard/storyboard.service';
 import {TimelineStateService} from '../../services/timeline-state.service';
 import {ProjectStateService} from '../../../services/project/project-state.service';
-import {combineLatest, of} from 'rxjs';
+import {of} from 'rxjs';
 import {catchError} from 'rxjs/operators';
-import {CommonModule} from '@angular/common';
-import {FormsModule} from '@angular/forms';
-import {MatIconModule} from '@angular/material/icon';
-import {MatButtonModule} from '@angular/material/button';
-import {MarkdownModule, MarkdownService} from 'ngx-markdown';
+import {MarkdownService} from 'ngx-markdown';
 
 import {ConfirmationDialogComponent} from '../../../common/components/confirmation-dialog/confirmation-dialog.component';
 import {MatDialog, MatDialogRef} from '@angular/material/dialog';
@@ -121,16 +117,19 @@ export class ChatInterfaceComponent
     {allowSignalWrites: true},
   );
 
-  private storyboardSessionSyncEffect = effect(() => {
-    const sb = this.agentChatService.currentStoryboard();
-    if (
-      sb &&
-      sb.session_id &&
-      sb.session_id !== this.agentChatService.selectedSessionId()
-    ) {
-      this.agentChatService.selectedSessionId.set(sb.session_id);
-    }
-  });
+  private storyboardSessionSyncEffect = effect(
+    () => {
+      const sb = this.agentChatService.currentStoryboard();
+      if (
+        sb &&
+        sb.session_id &&
+        sb.session_id !== this.agentChatService.selectedSessionId()
+      ) {
+        this.agentChatService.selectedSessionId.set(sb.session_id);
+      }
+    },
+    {allowSignalWrites: true},
+  );
 
   private resolvingAssetIds = new Set<string>();
 
@@ -203,7 +202,6 @@ export class ChatInterfaceComponent
     return this.agentChatService.activeAgent();
   }
 
-  isBrowser = true;
   private shouldScrollToBottom = true;
 
   @ViewChild('chatContainer') private chatContainer!: ElementRef;
@@ -230,7 +228,6 @@ export class ChatInterfaceComponent
   });
 
   ngOnInit() {
-    this.isBrowser = typeof window !== 'undefined';
     this.markdownService.renderer.link = (
       arg1: any,
       arg2?: any,
@@ -284,14 +281,6 @@ export class ChatInterfaceComponent
     this.lastLoadedWorkspaceId = null;
     this.lastLoadedSessionId = null;
     this.lastLoadedStoryboardId = null;
-  }
-
-  private clearTimeline() {
-    this.timelineState.loadedTimelineId.set(undefined);
-    this.timelineState.timelineClips.set([]);
-    this.timelineState.transitions.set([]);
-    this.timelineState.transitionIn.set(null);
-    this.timelineState.transitionOut.set(null);
   }
 
   private loadSessionDetail(

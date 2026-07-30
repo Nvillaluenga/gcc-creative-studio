@@ -33,7 +33,7 @@ import {
 import {isPlatformBrowser} from '@angular/common';
 import {HttpClient} from '@angular/common/http';
 import {MatIconRegistry} from '@angular/material/icon';
-import {DomSanitizer, SafeResourceUrl} from '@angular/platform-browser';
+import {DomSanitizer} from '@angular/platform-browser';
 import {MatDialog} from '@angular/material/dialog';
 import {
   ImageSelectorComponent,
@@ -726,7 +726,7 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
       this.timelineState.assets.update(prev => [...prev, asset]);
 
       if (isVideo) {
-        this.extractVideoMetadata(asset, file);
+        this.extractVideoMetadata(asset);
       } else {
         this.extractAudioMetadata(asset);
       }
@@ -877,13 +877,13 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     audio.onloadedmetadata = () => {
       this.updateAssetDuration(asset.id, audio.duration);
     };
-    audio.onerror = e => {
+    audio.onerror = () => {
       // If audio fails to load metadata, set a default duration
       this.updateAssetDuration(asset.id, 10);
     };
   }
 
-  extractVideoMetadata(asset: MediaAsset, file: File) {
+  extractVideoMetadata(asset: MediaAsset) {
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.muted = true;
@@ -1446,7 +1446,6 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     }
   }
 
-  onVideoEnded() {}
   onVideoMetadataLoaded(event: Event) {
     const video = event.target as HTMLVideoElement;
     if (video && video.videoWidth && video.videoHeight) {

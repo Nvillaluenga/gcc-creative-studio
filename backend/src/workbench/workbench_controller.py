@@ -118,7 +118,12 @@ async def create_timeline(
         storyboard = await project_service.get_storyboard(
             timeline_create.storyboard_id
         )
-        if storyboard and storyboard.user_id != current_user.id:
+        if not storyboard:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Storyboard with ID '{timeline_create.storyboard_id}' not found.",
+            )
+        if storyboard.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to access this storyboard.",
