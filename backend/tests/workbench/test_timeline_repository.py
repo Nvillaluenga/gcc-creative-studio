@@ -17,7 +17,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.workbench.schema.timeline_model import Timeline, VideoClip, AudioClip
-from src.projects.schema.project_model import Storyboard
+from src.workbench.schema.project_model import Storyboard
 from src.workbench.dto.workbench_dto import (
     AssetRef,
     AudioClip as AudioClipDTO,

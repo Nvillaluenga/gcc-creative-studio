@@ -20,7 +20,6 @@ from typing import Optional, List
 # Scene DTO
 class SceneDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: Optional[int] = None
     topic: Optional[str] = None
     duration_seconds: Optional[float] = None
@@ -44,30 +43,6 @@ class SceneDTO(BaseModel):
     audio_sfx_description: Optional[str] = None
 
 
-# Storyboard DTO
-class StoryboardDTO(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: Optional[int] = None
-    session_id: Optional[str] = None
-    template_name: Optional[str] = None
-    bg_music_description: Optional[str] = None
-    bg_music_asset_id: Optional[int] = None
-    scenes: List[SceneDTO] = []
-
-
-# Clip DTOs
-
-
-# Canvas DTO
-class CanvasDTO(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    title: Optional[str] = None
-    html_content: Optional[str] = None
-
-
 class ProjectCreate(BaseModel):
     workspace_id: int
     name: str = Field(..., min_length=1, max_length=255)
@@ -87,7 +62,6 @@ class ProjectUpdate(BaseModel):
 
 class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     workspace_id: int
     owner_id: int
@@ -105,7 +79,6 @@ class ProjectResponse(BaseModel):
 
 class StoryboardCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="allow")
-
     project_id: int
     session_id: Optional[str] = None
     template_name: Optional[str] = None
@@ -115,7 +88,6 @@ class StoryboardCreate(BaseModel):
 
 class StoryboardUpdate(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="allow")
-
     template_name: Optional[str] = None
     bg_music_description: Optional[str] = None
     bg_music_asset_id: Optional[int] = None
@@ -126,7 +98,6 @@ class StoryboardUpdate(BaseModel):
 
 class StoryboardCreateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     user_id: int
     project_id: int
@@ -138,7 +109,6 @@ class StoryboardCreateResponse(BaseModel):
 
 class StoryboardResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     user_id: int
     project_id: int
@@ -147,6 +117,5 @@ class StoryboardResponse(BaseModel):
     template_name: Optional[str] = None
     bg_music_description: Optional[str] = None
     bg_music_asset_id: Optional[int] = None
-
     scenes: List[SceneDTO] = []
     timeline_id: Optional[int] = None

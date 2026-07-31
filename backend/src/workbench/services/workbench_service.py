@@ -61,7 +61,7 @@ from src.workbench.dto.workbench_dto import (
     VideoClip,
     VideoTimeline,
 )
-from src.workbench.ffmpeg_service import FFmpegService
+from src.workbench.services.ffmpeg_service import FFmpegService
 from src.workbench.repository.timeline_repository import TimelineRepository
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,9 @@ def _process_timeline_in_background(
                     from src.workbench.repository.timeline_repository import (
                         TimelineRepository,
                     )
-                    from src.workbench.workbench_service import WorkbenchService
+                    from src.workbench.services.workbench_service import (
+                        WorkbenchService,
+                    )
                     from src.source_assets.repository.source_asset_repository import (
                         SourceAssetRepository,
                     )

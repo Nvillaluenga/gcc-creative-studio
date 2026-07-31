@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.common.base_repository import BaseRepository
 from src.database import get_db
 from src.workbench.schema.timeline_model import Timeline, VideoClip, AudioClip
-from src.projects.schema.project_model import Project, Storyboard
+from src.workbench.schema.project_model import Project, Storyboard
 from src.workbench.dto.workbench_dto import (
     AssetRef,
     AudioClip as AudioClipDTO,

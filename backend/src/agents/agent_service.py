@@ -26,10 +26,10 @@ from vertexai import agent_engines
 from src.config.config_service import config_service
 from src.users.user_model import UserModel
 from src.workspaces.workspace_service import WorkspaceService
-from src.projects.project_repository import StoryboardRepository
-from src.projects.project_service import ProjectService
+from src.workbench.repository.project_repository import StoryboardRepository
+from src.workbench.services.project_service import ProjectService
 from src.workspaces.workspace_auth_guard import WorkspaceAuth
-from src.projects.project_auth_guard import ProjectAuth
+from src.workbench.project_auth_guard import ProjectAuth
 from src.agents.agent_repository import AgentRepository
 from src.agents.agent_dtos import (
     ChatRequestDto,

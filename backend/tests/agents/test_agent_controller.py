@@ -23,11 +23,11 @@ from src.database import get_db
 from src.agents.agent_controller import router
 from src.users.user_model import UserModel
 from src.agents.agent_chat_event_model import AgentChatEvent
-from src.projects.project_repository import StoryboardRepository
-from src.projects.project_service import ProjectService
+from src.workbench.repository.project_repository import StoryboardRepository
+from src.workbench.services.project_service import ProjectService
 from src.agents.agent_repository import AgentRepository
 from src.workspaces.workspace_auth_guard import WorkspaceAuth
-from src.projects.project_auth_guard import ProjectAuth
+from src.workbench.project_auth_guard import ProjectAuth
 
 
 @pytest.fixture(name="mock_user")

@@ -14,13 +14,13 @@
 
 import asyncio
 from fastapi import Depends
-from src.projects.project_repository import (
+from src.workbench.repository.project_repository import (
     StoryboardRepository,
     ProjectRepository,
 )
 from src.images.repository.media_item_repository import MediaRepository
 from src.auth.iam_signer_credentials_service import IamSignerCredentials
-from src.projects.dto.project_dto import (
+from src.workbench.dto.project_dto import (
     ProjectCreate,
     ProjectUpdate,
     ProjectResponse,

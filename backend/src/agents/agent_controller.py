@@ -21,7 +21,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from src.auth.auth_guard import get_current_user
 from src.users.user_model import UserModel
 from src.agents.agent_service import AgentService
-from src.projects.project_auth_guard import ProjectAuth
+from src.workbench.project_auth_guard import ProjectAuth
 from src.agents.agent_dtos import (
     ChatRequestDto,
     ChatResponseDto,
