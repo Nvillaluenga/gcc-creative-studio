@@ -16,7 +16,7 @@
 
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
-from src.projects.dto.project_dto import StoryboardResponse
+from src.workbench.dto.project_dto import StoryboardResponse
 
 
 # --- Sub-components for Chat ---

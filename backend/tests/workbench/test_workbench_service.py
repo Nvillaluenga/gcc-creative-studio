@@ -34,8 +34,8 @@ from src.workbench.dto.workbench_dto import (
     VideoClip,
     VideoTimeline,
 )
-from src.workbench.ffmpeg_service import FFmpegService
-from src.workbench.workbench_service import WorkbenchService
+from src.workbench.services.ffmpeg_service import FFmpegService
+from src.workbench.services.workbench_service import WorkbenchService
 from src.common.schema.media_item_model import (
     MediaItemModel,
     MimeTypeEnum,
@@ -48,7 +48,7 @@ from src.common.schema.media_item_model import (
 @pytest.fixture(name="service")
 def fixture_service():
     with patch(
-        "src.workbench.workbench_service.storage.Client"
+        "src.workbench.services.workbench_service.storage.Client"
     ) as mock_storage_client:
         mock_gcs_service = AsyncMock()
         mock_timeline_repo = AsyncMock()
@@ -253,7 +253,7 @@ async def test_stitch_timeline_full_flow(service):
                 ],
             }
             with patch(
-                "src.workbench.ffmpeg_service.subprocess.run"
+                "src.workbench.services.ffmpeg_service.subprocess.run"
             ) as mock_sub:
                 mock_sub.return_value = MagicMock(
                     returncode=0, stdout=b"", stderr=b""
@@ -277,8 +277,12 @@ async def test_render_timeline_success_video_only(service):
     )
     request = TimelineRequest(clips=[clip])
 
-    with patch("src.workbench.workbench_service.urllib.request.urlretrieve"):
-        with patch("src.workbench.ffmpeg_service.subprocess.run") as mock_run:
+    with patch(
+        "src.workbench.services.workbench_service.urllib.request.urlretrieve"
+    ):
+        with patch(
+            "src.workbench.services.ffmpeg_service.subprocess.run"
+        ) as mock_run:
             mock_process_ffprobe = MagicMock(
                 returncode=0, stdout=b'{"streams": [{"codec_type": "video"}]}'
             )
@@ -315,8 +319,12 @@ async def test_render_timeline_ffmpeg_failure(service):
     )
     request = TimelineRequest(clips=[clip])
 
-    with patch("src.workbench.workbench_service.urllib.request.urlretrieve"):
-        with patch("src.workbench.ffmpeg_service.subprocess.run") as mock_run:
+    with patch(
+        "src.workbench.services.workbench_service.urllib.request.urlretrieve"
+    ):
+        with patch(
+            "src.workbench.services.ffmpeg_service.subprocess.run"
+        ) as mock_run:
             mock_ffprobe = MagicMock(
                 returncode=0, stdout=b'{"streams": [{"codec_type": "video"}]}'
             )

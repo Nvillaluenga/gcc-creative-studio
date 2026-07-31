@@ -14,8 +14,8 @@
 
 from fastapi import Depends, HTTPException, status
 from src.users.user_model import UserModel
-from src.projects.project_repository import ProjectRepository
-from src.projects.dto.project_dto import ProjectResponse
+from src.workbench.repository.project_repository import ProjectRepository
+from src.workbench.dto.project_dto import ProjectResponse
 
 
 class ProjectAuth:

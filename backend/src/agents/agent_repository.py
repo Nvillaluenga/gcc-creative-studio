@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.agents.agent_chat_event_model import AgentChatEvent
-from src.projects.schema.project_model import Session
+from src.workbench.schema.project_model import Session
 
 logger = logging.getLogger(__name__)
 

@@ -26,7 +26,7 @@ from src.database import Base
 from src.users.user_model import User
 
 if TYPE_CHECKING:
-    from src.projects.schema.project_model import Project
+    from src.workbench.schema.project_model import Project
 
 
 class WorkspaceRoleEnum(str, Enum):

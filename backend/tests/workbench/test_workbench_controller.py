@@ -22,7 +22,7 @@ from fastapi import status
 
 from main import app
 from src.workspaces.workspace_auth_guard import WorkspaceAuth
-from src.projects.project_auth_guard import ProjectAuth
+from src.workbench.project_auth_guard import ProjectAuth
 from src.workbench.dto.workbench_dto import TimelineResponse
 from src.galleries.dto.gallery_response_dto import MediaItemResponse
 from src.common.base_dto import (
@@ -37,7 +37,7 @@ from src.common.schema.media_item_model import (
     AspectRatioEnum,
     JobStatusEnum,
 )
-from src.workbench.workbench_service import WorkbenchService
+from src.workbench.services.workbench_service import WorkbenchService
 
 
 @pytest.fixture(name="mock_workbench_service")
@@ -47,8 +47,8 @@ def fixture_mock_workbench_service():
 
 
 from fastapi.security import HTTPAuthorizationCredentials
-from src.workbench.workbench_controller import security
-from src.projects.project_service import ProjectService
+from src.workbench.controllers.workbench_controller import security
+from src.workbench.services.project_service import ProjectService
 
 
 @pytest.fixture(name="mock_project_service")
@@ -174,7 +174,7 @@ class TestWorkbenchController:
     def test_list_timelines(
         self, api_client, mock_workbench_service, mock_project_service
     ):
-        from src.projects.dto.project_dto import StoryboardResponse
+        from src.workbench.dto.project_dto import StoryboardResponse
 
         mock_sb = StoryboardResponse(
             id=30, project_id=1, user_id=1, template_name="test"

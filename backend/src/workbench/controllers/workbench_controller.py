@@ -23,9 +23,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from src.auth.auth_guard import get_current_user
 from src.users.user_model import UserModel
-from src.projects.project_service import ProjectService
+from src.workbench.services.project_service import ProjectService
 from src.workspaces.workspace_auth_guard import WorkspaceAuth
-from src.projects.project_auth_guard import ProjectAuth
+from src.workbench.project_auth_guard import ProjectAuth
 from src.workbench.dto.workbench_dto import (
     TimelineRequest,
     TimelineCreate,
@@ -34,7 +34,7 @@ from src.workbench.dto.workbench_dto import (
     RenderTimelineRequest,
 )
 from src.galleries.dto.gallery_response_dto import MediaItemResponse
-from src.workbench.workbench_service import WorkbenchService
+from src.workbench.services.workbench_service import WorkbenchService
 
 router = APIRouter(
     prefix="/api/workbench",

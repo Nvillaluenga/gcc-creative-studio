@@ -15,9 +15,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from src.auth.auth_guard import get_current_user
 from src.users.user_model import UserModel
-from src.projects.project_service import ProjectService
+from src.workbench.services.project_service import ProjectService
 from src.workspaces.workspace_auth_guard import WorkspaceAuth
-from src.projects.dto.project_dto import (
+from src.workbench.dto.project_dto import (
     ProjectCreate,
     ProjectUpdate,
     ProjectResponse,
