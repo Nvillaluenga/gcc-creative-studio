@@ -14,7 +14,7 @@
 """Repository for interacting with AgentChatEvent models."""
 
 import logging
-from typing import List, Sequence
+from typing import List, Sequence, Dict, Any
 from fastapi import Depends
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -92,3 +92,43 @@ class AgentRepository:
         stmt = select(Session).where(Session.session_id.in_(session_ids))
         result = await self.db.execute(stmt)
         return result.scalars().all()
+
+    async def get_session_by_id(self, session_id: str) -> Session | None:
+        """Fetch a single session record by session_id."""
+        stmt = select(Session).where(Session.session_id == session_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def update_session_record(
+        self, session_id: str, update_data: Dict[str, Any]
+    ) -> Session | None:
+        """Update a session record dynamically."""
+        stmt = select(Session).where(Session.session_id == session_id)
+        result = await self.db.execute(stmt)
+        session_record = result.scalar_one_or_none()
+        if not session_record:
+            return None
+
+        restricted_fields = {"id", "project_id", "session_id"}
+        for key, value in update_data.items():
+            if key in restricted_fields:
+                continue
+            if key in Session.__mapper__.columns:
+                setattr(session_record, key, value)
+
+        await self.db.commit()
+        await self.db.refresh(session_record)
+        return session_record
+
+    async def delete_session_record_and_events(self, session_id: str) -> None:
+        """Delete a session record and all its chat events from the database."""
+        delete_events_stmt = delete(AgentChatEvent).where(
+            AgentChatEvent.session_id == session_id
+        )
+        await self.db.execute(delete_events_stmt)
+
+        delete_session_stmt = delete(Session).where(
+            Session.session_id == session_id
+        )
+        await self.db.execute(delete_session_stmt)
+        await self.db.commit()

@@ -174,6 +174,11 @@ export class AgentChatService {
     return this.http.delete<void>(url);
   }
 
+  updateSession(sessionId: string, name: string): Observable<any> {
+    const url = `${this.apiUrl}/sessions/${sessionId}`;
+    return this.http.put<any>(url, {name});
+  }
+
   generateTitle(text: string): Observable<any> {
     return this.http.post(
       `${environment.backendURL}/gemini/generate-title?appName=${this.activeAgent()}`,

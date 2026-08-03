@@ -851,8 +851,8 @@ export class ChatInterfaceComponent
     this.sessions.set([]);
     this.loadChatSessions();
   }
-  deleteChat() {
-    if (!this.currentSessionId) return;
+  deleteSessionFromDropdown(option: DropdownOption) {
+    const sessionId = option.value;
     const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
       data: {
         title: 'Delete Chat',
@@ -863,25 +863,61 @@ export class ChatInterfaceComponent
       if (result) {
         const workspaceId = this.workspaceStateService.getActiveWorkspaceId();
         this.agentChatService
-          .deleteSession(this.currentSessionId!, workspaceId ?? undefined)
+          .deleteSession(sessionId, workspaceId ?? undefined)
           .subscribe({
             next: () => {
               this.sessions.update(s =>
-                s.filter(sess => sess.id !== this.currentSessionId),
+                s.filter(sess => sess.id !== sessionId),
               );
-              this.currentSessionId = null;
-              this.chatMessages.set([]);
-              if (this.sessions().length > 0) {
-                this.currentSessionId = this.sessions()[0].id;
-                this.loadChatMessages(this.currentSessionId!);
-              } else {
-                this.startNewChat();
+              if (this.currentSessionId === sessionId) {
+                this.currentSessionId = null;
+                this.chatMessages.set([]);
+                if (this.sessions().length > 0) {
+                  this.currentSessionId = this.sessions()[0].id;
+                  this.loadChatMessages(this.currentSessionId!);
+                } else {
+                  this.startNewChat();
+                }
               }
             },
             error: err => console.error('Error deleting session:', err),
           });
       }
     });
+  }
+
+  renameSession(event: {option: DropdownOption; newValue: string}) {
+    const sessionId = event.option.value;
+    const trimmedName = event.newValue.trim();
+    if (!trimmedName) {
+      this.snackBar.open('Chat name cannot be empty', 'Close', {duration: 3000});
+      return;
+    }
+
+    this.agentChatService
+      .updateSession(sessionId, trimmedName)
+      .subscribe({
+        next: () => {
+          this.sessions.update(s =>
+            s.map(sess => {
+              if (sess.id === sessionId) {
+                return {
+                  ...sess,
+                  name: trimmedName,
+                };
+              }
+              return sess;
+            }),
+          );
+          this.snackBar.open('Chat name updated successfully', 'Close', {
+            duration: 3000,
+          });
+        },
+        error: err => {
+          console.error('Error updating session name:', err);
+          handleErrorSnackbar(this.snackBar, err, 'Rename Chat');
+        },
+      });
   }
   sendChatMessage(text: string) {
     if ((!text || !text.trim()) && this.selectedImages().length === 0) return;

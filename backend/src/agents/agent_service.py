@@ -31,6 +31,7 @@ from src.workbench.services.project_service import ProjectService
 from src.workspaces.workspace_auth_guard import WorkspaceAuth
 from src.workbench.project_auth_guard import ProjectAuth
 from src.agents.agent_repository import AgentRepository
+from src.workbench.schema.project_model import Session
 from src.agents.agent_dtos import (
     ChatRequestDto,
     SessionResponseDto,
@@ -650,7 +651,14 @@ class AgentService:
                     f"Could not retrieve session for delete authorization: {e_err}"
                 )
 
-            self.client.agent_engines.sessions.delete(name=full_session_name)
+            try:
+                self.client.agent_engines.sessions.delete(name=full_session_name)
+            except Exception as remote_err:
+                logger.warning(
+                    f"Could not delete remote session from Agent Engines: {remote_err}"
+                )
+
+            await self.agent_repo.delete_session_record_and_events(session_id)
             return {"status": "success"}
         except HTTPException:
             raise
@@ -922,3 +930,32 @@ class AgentService:
         await self.agent_repo.delete_events(event_ids=event_ids)
 
         return PollEventsResponseDto(events=extracted_events)
+
+    async def update_session(
+        self,
+        current_user: UserModel,
+        session_id: str,
+        update_data: dict[str, Any],
+    ) -> Session:
+        # 1. Fetch the session record from DB
+        session_record = await self.agent_repo.get_session_by_id(session_id)
+        if not session_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session with ID '{session_id}' not found.",
+            )
+
+        # 2. Check authorization on the project
+        await self.project_auth.authorize(session_record.project_id, current_user)
+
+        # 3. Update the record
+        updated_record = await self.agent_repo.update_session_record(
+            session_id, update_data
+        )
+        if not updated_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session with ID '{session_id}' not found.",
+            )
+
+        return updated_record

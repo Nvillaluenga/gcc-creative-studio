@@ -29,6 +29,8 @@ from src.agents.agent_dtos import (
     SessionResponseDto,
     SessionDetailResponseDto,
     SessionCreateRequestDto,
+    SessionUpdateDto,
+    SessionDBResponse,
 )
 
 router = APIRouter(
@@ -187,4 +189,21 @@ async def poll_session_events(
     """Retrieve all pending stream chunks for a chat session queue and mark them as consumed."""
     return await agent_service.poll_session_events(
         session_id=session_id, current_user=current_user
+    )
+
+
+@router.put("/sessions/{session_id}", response_model=SessionDBResponse)
+async def update_session(
+    session_id: str,
+    payload: SessionUpdateDto,
+    current_user: UserModel = Depends(get_current_user),
+    agent_service: AgentService = Depends(),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Update a specific session record in the database."""
+    update_data = payload.model_dump(exclude_unset=True)
+    return await agent_service.update_session(
+        current_user=current_user,
+        session_id=session_id,
+        update_data=update_data,
     )

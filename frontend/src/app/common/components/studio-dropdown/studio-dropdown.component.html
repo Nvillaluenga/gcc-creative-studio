@@ -111,7 +111,7 @@
             </button>
             <!-- Delete Button -->
             <button mat-icon-button *ngIf="deletable && option.deletable !== false" (click)="onDeleteOption(option, $event)"
-                        class="delete-btn">
+                        class="delete-btn" [class.ml-auto]="!editable">
               <mat-icon>delete</mat-icon>
             </button>
             </div>
