@@ -44,7 +44,15 @@ export class ProjectStateService {
     }
 
     this.workspaceStateService.activeWorkspaceId$.subscribe(() => {
-      const isWorkbench = this.router.url.includes('/workbench');
+      const currentUrl = this.router.url;
+      const navigation = this.router.getCurrentNavigation();
+      const targetUrl = navigation
+        ? navigation.finalUrl?.toString() ||
+          navigation.extractedUrl?.toString() ||
+          ''
+        : '';
+      const isWorkbench =
+        currentUrl.includes('/workbench') || targetUrl.includes('/workbench');
       if (!isWorkbench) {
         this.setActiveProjectId(null);
       }

@@ -73,40 +73,41 @@ export class WorkspaceSwitcherComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadWorkspaces();
-    this.workspaceStateService.activeWorkspaceId$.subscribe(id => {
-      // Ensure we handle both string (from legacy/url) and number types safely if needed,
-      // but ideally workspaceStateService should also be consistent.
-      // Assuming workspaceStateService might still emit strings if not updated, let's cast or parse if needed.
-      // For now, let's assume strict number typing is propagated.
-      // Actually, workspaceStateService might need checking too.
-      // Let's assume id is number here based on the goal.
-      this.activeWorkspaceId = typeof id === 'string' ? parseInt(id, 10) : id;
-      this.activeWorkspace =
-        this.workspaces.find(w => w.id === this.activeWorkspaceId) || null;
-    });
-
-    this.brandGuidelineService.activeBrandGuidelineJob$.subscribe(job => {
-      if (job) {
-        if (job.status === JobStatus.COMPLETED) {
-          handleSuccessSnackbar(
-            this.snackBar,
-            'Brand Guidelines processed successfully!',
-          );
-          // Reset the job so the spinner disappears and the button is re-enabled.
-          this.brandGuidelineService.clearActiveJob();
-        } else if (job.status === JobStatus.FAILED) {
-          handleErrorSnackbar(
-            this.snackBar,
-            {
-              message: job.errorMessage || 'Brand Guideline processing failed.',
-            },
-            'Processing Error',
-          );
-          this.brandGuidelineService.clearActiveJob();
+    if (this.isBrowser) {
+      this.loadWorkspaces();
+      this.workspaceStateService.activeWorkspaceId$.subscribe(id => {
+        // Ensure we handle both string (from legacy/url) and number types safely if needed,
+        // but ideally workspaceStateService should also be consistent.
+        // Assuming workspaceStateService might still emit strings if not updated, let's cast or parse if needed.
+        // For now, let's assume strict number typing is propagated.
+        // Actually, workspaceStateService might need checking too.
+        // Let's assume id is number here based on the goal.
+        this.activeWorkspaceId = typeof id === 'string' ? parseInt(id, 10) : id;
+        this.activeWorkspace =
+          this.workspaces.find(w => w.id === this.activeWorkspaceId) || null;
+      });
+      this.brandGuidelineService.activeBrandGuidelineJob$.subscribe(job => {
+        if (job) {
+          if (job.status === JobStatus.COMPLETED) {
+            handleSuccessSnackbar(
+              this.snackBar,
+              'Brand Guidelines processed successfully!',
+            );
+            // Reset the job so the spinner disappears and the button is re-enabled.
+            this.brandGuidelineService.clearActiveJob();
+          } else if (job.status === JobStatus.FAILED) {
+            handleErrorSnackbar(
+              this.snackBar,
+              {
+                message: job.errorMessage || 'Brand Guideline processing failed.',
+              },
+              'Processing Error',
+            );
+            this.brandGuidelineService.clearActiveJob();
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   loadWorkspaces(): void {

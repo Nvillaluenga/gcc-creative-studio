@@ -61,7 +61,9 @@ export class AuthInterceptor implements HttpInterceptor {
             'AuthInterceptor: Session expired and could not be refreshed. Logging out.',
             error,
           );
-          void this.authService.logout();
+          if (this.authService.isUserLoggedIn()) {
+            void this.authService.logout();
+          }
         }
 
         // Otherwise, it's a backend API error (e.g., 404, 500). We should NOT log out.

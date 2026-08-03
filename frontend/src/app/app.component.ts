@@ -62,13 +62,11 @@ export class AppComponent {
   ) {
     this.router.events.subscribe((event: NavigationEvent) => {
       if (event instanceof NavigationEnd) {
+        const path = event.url.split('?')[0];
         if (
-          event.url === '/login' ||
-          event.url === '/login/e2e' ||
-          (event.url.includes('login') && event.url.includes('email')) ||
-          (event.url.includes('login') && event.url.includes('tos')) ||
-          event.url.includes('reset-password') ||
-          event.url.includes('support-ticket')
+          path.startsWith('/login') ||
+          path.startsWith('/reset-password') ||
+          path.startsWith('/support-ticket')
         ) {
           this.showHeader = false;
         } else {

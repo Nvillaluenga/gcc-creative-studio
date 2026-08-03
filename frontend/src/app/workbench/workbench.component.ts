@@ -413,6 +413,8 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    if (!this.isBrowser) return;
+
     // save timeline after 10 seconds of inactivity
     this.saveSubscription = this.saveSubject
       .pipe(debounceTime(10000))
@@ -488,7 +490,12 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
                 void this.router
                   .navigate([], {
                     relativeTo: this.route,
-                    queryParams: {projectId: activeId},
+                    queryParams: {
+                      projectId: activeId,
+                      storyboardId: project.storyboard_id || null,
+                      timelineId: project.timeline_id || null,
+                      sessionId: project.session_id || null,
+                    },
                     queryParamsHandling: 'merge',
                   })
                   .then(() => {
@@ -698,6 +705,23 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     if (this.projectStateSubscription) {
       this.projectStateSubscription.unsubscribe();
     }
+
+    // Clear timeline state on destroy
+    this.timelineState.loadedTimelineId.set(undefined);
+    this.timelineState.timelineClips.set([]);
+    this.timelineState.transitions.set([]);
+    this.timelineState.transitionIn.set(null);
+    this.timelineState.transitionOut.set(null);
+    this.timelineState.selectedClipId.set(null);
+    this.timelineState.assets.set([]);
+    this.timelineState.currentTime.set(0);
+    this.timelineState.isPlaying.set(false);
+    this.timelineState.scrollOffset.set(0);
+
+    // Clear agent chat state on destroy
+    this.agentChatService.currentStoryboard.set(null);
+    this.agentChatService.selectedSessionId.set(null);
+    this.agentChatService.chatMessages.set([]);
   }
 
   // --- Logic: File Handling ---
