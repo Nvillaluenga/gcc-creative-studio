@@ -62,10 +62,10 @@ class Timeline(Base):
     def workspace_id(self) -> int | None:
         if hasattr(self, "_workspace_id") and self._workspace_id is not None:
             return self._workspace_id
-        insp = inspect(self)
-        if insp is not None and "project" in insp.unloaded:
+        try:
+            return self.project.workspace_id if self.project else None
+        except Exception:
             return None
-        return self.project.workspace_id if self.project else None
 
     @workspace_id.setter
     def workspace_id(self, value):

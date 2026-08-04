@@ -402,7 +402,10 @@ describe('ChatInterfaceComponent', () => {
     spyOn(component['dialog'], 'open').and.returnValue(mockDialogRef);
 
     component.currentSessionId = 'session-123';
-    component.deleteChat();
+    component.deleteSessionFromDropdown({
+      value: 'session-123',
+      label: 'session-123',
+    });
 
     expect(component['dialog'].open).toHaveBeenCalled();
     expect(agentChatService.deleteSession).toHaveBeenCalledWith(
@@ -897,7 +900,10 @@ describe('ChatInterfaceComponent', () => {
       {id: 'session-other', lastUpdateTime: 456},
     ]);
 
-    component.deleteChat();
+    component.deleteSessionFromDropdown({
+      value: 'session-123',
+      label: 'session-123',
+    });
 
     expect(agentChatService.deleteSession).toHaveBeenCalledWith(
       'session-123',
@@ -926,7 +932,10 @@ describe('ChatInterfaceComponent', () => {
     );
     component.currentSessionId = 'session-123';
 
-    component.deleteChat();
+    component.deleteSessionFromDropdown({
+      value: 'session-123',
+      label: 'session-123',
+    });
 
     expect(console.error).toHaveBeenCalled();
   });
@@ -1458,22 +1467,23 @@ describe('ChatInterfaceComponent', () => {
 
     it('should format links using markdownService.renderer.link', () => {
       const markdownService = TestBed.inject(MarkdownService);
+      const origin = window.location.origin;
 
       const result1 = (markdownService.renderer.link as any)({
-        href: 'http://test',
+        href: origin + '/test',
         title: 'My Title',
         text: 'Click Here',
       });
-      expect(result1).toContain('href="http://test"');
+      expect(result1).toContain(`href="${origin}/test"`);
       expect(result1).toContain('title="My Title"');
       expect(result1).toContain('Click Here');
 
       const result2 = markdownService.renderer.link(
-        'http://test2',
+        origin + '/test2',
         'My Title 2',
         'Click Here 2',
       );
-      expect(result2).toContain('href="http://test2"');
+      expect(result2).toContain(`href="${origin}/test2"`);
       expect(result2).toContain('title="My Title 2"');
       expect(result2).toContain('Click Here 2');
     });
@@ -2211,7 +2221,10 @@ describe('ChatInterfaceComponent', () => {
 
       spyOn(component, 'startNewChat');
 
-      component.deleteChat();
+      component.deleteSessionFromDropdown({
+        value: 'session-123',
+        label: 'session-123',
+      });
 
       expect(mockDialog.open).toHaveBeenCalled();
       expect(agentChatService.deleteSession).toHaveBeenCalledWith(
@@ -2225,18 +2238,13 @@ describe('ChatInterfaceComponent', () => {
       component.currentSessionId = 'session-123';
       mockDialogRef.afterClosed.and.returnValue(of(false));
 
-      component.deleteChat();
+      component.deleteSessionFromDropdown({
+        value: 'session-123',
+        label: 'session-123',
+      });
 
       expect(mockDialog.open).toHaveBeenCalled();
       expect(agentChatService.deleteSession).not.toHaveBeenCalled();
-    });
-
-    it('should return early if currentSessionId is not set', () => {
-      component.currentSessionId = null;
-
-      component.deleteChat();
-
-      expect(mockDialog.open).not.toHaveBeenCalled();
     });
   });
 

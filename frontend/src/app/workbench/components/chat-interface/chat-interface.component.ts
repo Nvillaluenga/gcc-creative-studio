@@ -890,34 +890,34 @@ export class ChatInterfaceComponent
     const sessionId = event.option.value;
     const trimmedName = event.newValue.trim();
     if (!trimmedName) {
-      this.snackBar.open('Chat name cannot be empty', 'Close', {duration: 3000});
+      this.snackBar.open('Chat name cannot be empty', 'Close', {
+        duration: 3000,
+      });
       return;
     }
 
-    this.agentChatService
-      .updateSession(sessionId, trimmedName)
-      .subscribe({
-        next: () => {
-          this.sessions.update(s =>
-            s.map(sess => {
-              if (sess.id === sessionId) {
-                return {
-                  ...sess,
-                  name: trimmedName,
-                };
-              }
-              return sess;
-            }),
-          );
-          this.snackBar.open('Chat name updated successfully', 'Close', {
-            duration: 3000,
-          });
-        },
-        error: err => {
-          console.error('Error updating session name:', err);
-          handleErrorSnackbar(this.snackBar, err, 'Rename Chat');
-        },
-      });
+    this.agentChatService.updateSession(sessionId, trimmedName).subscribe({
+      next: () => {
+        this.sessions.update(s =>
+          s.map(sess => {
+            if (sess.id === sessionId) {
+              return {
+                ...sess,
+                name: trimmedName,
+              };
+            }
+            return sess;
+          }),
+        );
+        this.snackBar.open('Chat name updated successfully', 'Close', {
+          duration: 3000,
+        });
+      },
+      error: err => {
+        console.error('Error updating session name:', err);
+        handleErrorSnackbar(this.snackBar, err, 'Rename Chat');
+      },
+    });
   }
   sendChatMessage(text: string) {
     if ((!text || !text.trim()) && this.selectedImages().length === 0) return;

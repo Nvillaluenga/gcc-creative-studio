@@ -68,12 +68,10 @@ class Project(Base):
     def storyboard_id(self) -> int | None:
         if hasattr(self, "_storyboard_id") and self._storyboard_id is not None:
             return self._storyboard_id
-        from sqlalchemy import inspect
-
-        insp = inspect(self)
-        if insp is not None and "storyboard" in insp.unloaded:
+        try:
+            return self.storyboard.id if self.storyboard else None
+        except Exception:
             return None
-        return self.storyboard.id if self.storyboard else None
 
     @storyboard_id.setter
     def storyboard_id(self, value):
@@ -83,12 +81,10 @@ class Project(Base):
     def timeline_id(self) -> int | None:
         if hasattr(self, "_timeline_id") and self._timeline_id is not None:
             return self._timeline_id
-        from sqlalchemy import inspect
-
-        insp = inspect(self)
-        if insp is not None and "timeline" in insp.unloaded:
+        try:
+            return self.timeline.id if self.timeline else None
+        except Exception:
             return None
-        return self.timeline.id if self.timeline else None
 
     @timeline_id.setter
     def timeline_id(self, value):
@@ -96,18 +92,16 @@ class Project(Base):
 
     @property
     def session_id(self) -> str | None:
-        from sqlalchemy import inspect
-
-        insp = inspect(self)
-        if insp is not None and "sessions" in insp.unloaded:
+        try:
+            if not self.sessions:
+                return None
+            # Sort by id descending to get the newest session
+            sorted_sessions = sorted(
+                self.sessions, key=lambda s: s.id, reverse=True
+            )
+            return sorted_sessions[0].session_id
+        except Exception:
             return None
-        if not self.sessions:
-            return None
-        # Sort by id descending to get the newest session
-        sorted_sessions = sorted(
-            self.sessions, key=lambda s: s.id, reverse=True
-        )
-        return sorted_sessions[0].session_id
 
 
 class Storyboard(Base):
@@ -145,12 +139,10 @@ class Storyboard(Base):
     def workspace_id(self) -> int | None:
         if hasattr(self, "_workspace_id") and self._workspace_id is not None:
             return self._workspace_id
-        from sqlalchemy import inspect
-
-        insp = inspect(self)
-        if insp is not None and "project" in insp.unloaded:
+        try:
+            return self.project.workspace_id if self.project else None
+        except Exception:
             return None
-        return self.project.workspace_id if self.project else None
 
     @workspace_id.setter
     def workspace_id(self, value):

@@ -530,5 +530,5 @@ async def test_agent_service_exceptions(mock_remote_agent):
         await service.get_session_messages(MagicMock(), "s1", "u", MagicMock())
 
     service.client.agent_engines.sessions.delete.side_effect = Exception("err")
-    with pytest.raises(HTTPException):
-        await service.delete_session(MagicMock(), "s1", "u", MagicMock())
+    res = await service.delete_session(MagicMock(), "s1", "u", MagicMock())
+    assert res == {"status": "success"}

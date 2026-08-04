@@ -99,7 +99,8 @@ export class WorkspaceSwitcherComponent implements OnInit {
             handleErrorSnackbar(
               this.snackBar,
               {
-                message: job.errorMessage || 'Brand Guideline processing failed.',
+                message:
+                  job.errorMessage || 'Brand Guideline processing failed.',
               },
               'Processing Error',
             );

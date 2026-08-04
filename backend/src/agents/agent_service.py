@@ -652,7 +652,9 @@ class AgentService:
                 )
 
             try:
-                self.client.agent_engines.sessions.delete(name=full_session_name)
+                self.client.agent_engines.sessions.delete(
+                    name=full_session_name
+                )
             except Exception as remote_err:
                 logger.warning(
                     f"Could not delete remote session from Agent Engines: {remote_err}"
@@ -946,7 +948,9 @@ class AgentService:
             )
 
         # 2. Check authorization on the project
-        await self.project_auth.authorize(session_record.project_id, current_user)
+        await self.project_auth.authorize(
+            session_record.project_id, current_user
+        )
 
         # 3. Update the record
         updated_record = await self.agent_repo.update_session_record(
