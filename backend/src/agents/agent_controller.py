@@ -21,12 +21,16 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from src.auth.auth_guard import get_current_user
 from src.users.user_model import UserModel
 from src.agents.agent_service import AgentService
+from src.workbench.project_auth_guard import ProjectAuth
 from src.agents.agent_dtos import (
     ChatRequestDto,
     ChatResponseDto,
     PollEventsResponseDto,
     SessionResponseDto,
     SessionDetailResponseDto,
+    SessionCreateRequestDto,
+    SessionUpdateDto,
+    SessionDBResponse,
 )
 
 router = APIRouter(
@@ -44,6 +48,7 @@ security = HTTPBearer()
 async def get_sessions(
     request: Request,
     workspace_id: int | None = None,
+    project_id: int | None = None,
     appName: str = APP_NAME,
     current_user: UserModel = Depends(get_current_user),
     agent_service: AgentService = Depends(),
@@ -56,6 +61,7 @@ async def get_sessions(
         user_id=user_id,
         request=request,
         workspace_id=workspace_id,
+        project_id=project_id,
         appName=appName,
     )
 
@@ -63,6 +69,7 @@ async def get_sessions(
 @router.post("/sessions", response_model=SessionResponseDto)
 async def create_session(
     request: Request,
+    payload: SessionCreateRequestDto,
     workspace_id: int | None = None,
     appName: str = APP_NAME,
     current_user: UserModel = Depends(get_current_user),
@@ -76,6 +83,8 @@ async def create_session(
         user_id=user_id,
         request=request,
         workspace_id=workspace_id,
+        project_id=payload.projectId,
+        name=payload.name,
         appName=appName,
     )
 
@@ -86,6 +95,7 @@ async def get_session_detail(
     request: Request,
     session_id: str | None = None,
     storyboard_id: int | None = None,
+    project_id: int | None = None,
     appName: str = APP_NAME,
     current_user: UserModel = Depends(get_current_user),
     agent_service: AgentService = Depends(),
@@ -98,6 +108,7 @@ async def get_session_detail(
         request=request,
         session_id=session_id,
         storyboard_id=storyboard_id,
+        project_id=project_id,
         appName=appName,
     )
 
@@ -107,6 +118,7 @@ async def get_session_messages(
     session_id: str,
     request: Request,
     workspace_id: int | None = None,
+    project_id: int | None = None,
     appName: str = APP_NAME,
     current_user: UserModel = Depends(get_current_user),
     agent_service: AgentService = Depends(),
@@ -120,6 +132,7 @@ async def get_session_messages(
         user_id=user_id,
         request=request,
         workspace_id=workspace_id,
+        project_id=project_id,
         appName=appName,
     )
 
@@ -129,6 +142,7 @@ async def delete_session(
     session_id: str,
     request: Request,
     workspace_id: int | None = None,
+    project_id: int | None = None,
     appName: str = APP_NAME,
     current_user: UserModel = Depends(get_current_user),
     agent_service: AgentService = Depends(),
@@ -142,6 +156,7 @@ async def delete_session(
         user_id=user_id,
         request=request,
         workspace_id=workspace_id,
+        project_id=project_id,
         appName=appName,
     )
 
@@ -174,4 +189,21 @@ async def poll_session_events(
     """Retrieve all pending stream chunks for a chat session queue and mark them as consumed."""
     return await agent_service.poll_session_events(
         session_id=session_id, current_user=current_user
+    )
+
+
+@router.put("/sessions/{session_id}", response_model=SessionDBResponse)
+async def update_session(
+    session_id: str,
+    payload: SessionUpdateDto,
+    current_user: UserModel = Depends(get_current_user),
+    agent_service: AgentService = Depends(),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Update a specific session record in the database."""
+    update_data = payload.model_dump(exclude_unset=True)
+    return await agent_service.update_session(
+        current_user=current_user,
+        session_id=session_id,
+        update_data=update_data,
     )

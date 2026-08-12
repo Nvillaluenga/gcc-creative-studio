@@ -18,7 +18,7 @@ import {Component, OnInit, Inject, PLATFORM_ID} from '@angular/core';
 import {isPlatformBrowser} from '@angular/common';
 import {MatDialog} from '@angular/material/dialog';
 import {MatSnackBar} from '@angular/material/snack-bar';
-import {ActivatedRoute} from '@angular/router';
+import {ActivatedRoute, Router} from '@angular/router';
 import {map, switchMap} from 'rxjs';
 import {WorkspaceStateService} from '../../../services/workspace/workspace-state.service';
 import {WorkspaceService} from '../../../services/workspace/workspace.service';
@@ -63,6 +63,7 @@ export class WorkspaceSwitcherComponent implements OnInit {
     public brandGuidelineService: BrandGuidelineService,
     private userService: UserService,
     private route: ActivatedRoute,
+    private router: Router,
     public dialog: MatDialog,
     private snackBar: MatSnackBar,
     @Inject(PLATFORM_ID) platformId: Object,
@@ -72,40 +73,42 @@ export class WorkspaceSwitcherComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.loadWorkspaces();
-    this.workspaceStateService.activeWorkspaceId$.subscribe(id => {
-      // Ensure we handle both string (from legacy/url) and number types safely if needed,
-      // but ideally workspaceStateService should also be consistent.
-      // Assuming workspaceStateService might still emit strings if not updated, let's cast or parse if needed.
-      // For now, let's assume strict number typing is propagated.
-      // Actually, workspaceStateService might need checking too.
-      // Let's assume id is number here based on the goal.
-      this.activeWorkspaceId = typeof id === 'string' ? parseInt(id, 10) : id;
-      this.activeWorkspace =
-        this.workspaces.find(w => w.id === this.activeWorkspaceId) || null;
-    });
-
-    this.brandGuidelineService.activeBrandGuidelineJob$.subscribe(job => {
-      if (job) {
-        if (job.status === JobStatus.COMPLETED) {
-          handleSuccessSnackbar(
-            this.snackBar,
-            'Brand Guidelines processed successfully!',
-          );
-          // Reset the job so the spinner disappears and the button is re-enabled.
-          this.brandGuidelineService.clearActiveJob();
-        } else if (job.status === JobStatus.FAILED) {
-          handleErrorSnackbar(
-            this.snackBar,
-            {
-              message: job.errorMessage || 'Brand Guideline processing failed.',
-            },
-            'Processing Error',
-          );
-          this.brandGuidelineService.clearActiveJob();
+    if (this.isBrowser) {
+      this.loadWorkspaces();
+      this.workspaceStateService.activeWorkspaceId$.subscribe(id => {
+        // Ensure we handle both string (from legacy/url) and number types safely if needed,
+        // but ideally workspaceStateService should also be consistent.
+        // Assuming workspaceStateService might still emit strings if not updated, let's cast or parse if needed.
+        // For now, let's assume strict number typing is propagated.
+        // Actually, workspaceStateService might need checking too.
+        // Let's assume id is number here based on the goal.
+        this.activeWorkspaceId = typeof id === 'string' ? parseInt(id, 10) : id;
+        this.activeWorkspace =
+          this.workspaces.find(w => w.id === this.activeWorkspaceId) || null;
+      });
+      this.brandGuidelineService.activeBrandGuidelineJob$.subscribe(job => {
+        if (job) {
+          if (job.status === JobStatus.COMPLETED) {
+            handleSuccessSnackbar(
+              this.snackBar,
+              'Brand Guidelines processed successfully!',
+            );
+            // Reset the job so the spinner disappears and the button is re-enabled.
+            this.brandGuidelineService.clearActiveJob();
+          } else if (job.status === JobStatus.FAILED) {
+            handleErrorSnackbar(
+              this.snackBar,
+              {
+                message:
+                  job.errorMessage || 'Brand Guideline processing failed.',
+              },
+              'Processing Error',
+            );
+            this.brandGuidelineService.clearActiveJob();
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   loadWorkspaces(): void {
@@ -136,12 +139,20 @@ export class WorkspaceSwitcherComponent implements OnInit {
       preferredWorkspaceId = parseInt(storedWorkspaceId, 10);
     }
 
+    const hasRouteProject =
+      typeof window !== 'undefined' &&
+      (window.location.search.includes('projectId') ||
+        window.location.search.includes('storyboardId') ||
+        window.location.search.includes('timelineId') ||
+        window.location.search.includes('sessionId'));
+    const skipNav = hasRouteProject;
+
     if (
       preferredWorkspaceId &&
       !isNaN(preferredWorkspaceId) &&
       this.workspaces.some(w => w.id === preferredWorkspaceId)
     ) {
-      this.setActiveWorkspace(preferredWorkspaceId);
+      this.setActiveWorkspace(preferredWorkspaceId, skipNav);
       return;
     }
 
@@ -161,14 +172,14 @@ export class WorkspaceSwitcherComponent implements OnInit {
     );
     if (googleWorkspace) {
       // Fallback to public workspace
-      this.setActiveWorkspace(googleWorkspace.id);
+      this.setActiveWorkspace(googleWorkspace.id, skipNav);
     } else if (this.workspaces.length > 0) {
       // Fallback to the first workspace
-      this.setActiveWorkspace(this.workspaces[0].id);
+      this.setActiveWorkspace(this.workspaces[0].id, skipNav);
     }
   }
 
-  setActiveWorkspace(workspaceId: number | null): void {
+  setActiveWorkspace(workspaceId: number | null, skipNavigation = false): void {
     // We might need to cast to any if workspaceStateService expects string,
     // but we should check that service too. For now, let's assume we pass number.
     this.workspaceStateService.setActiveWorkspaceId(workspaceId);
@@ -176,12 +187,17 @@ export class WorkspaceSwitcherComponent implements OnInit {
       this.workspaces.find(w => w.id === workspaceId) || null;
     this.brandGuidelineService.clearCache();
 
-    if (this.isBrowser) {
-      if (workspaceId) {
-        localStorage.setItem('activeWorkspaceId', workspaceId.toString());
-      } else {
-        localStorage.removeItem('activeWorkspaceId');
-      }
+    if (!skipNavigation) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: {
+          projectId: null,
+          storyboardId: null,
+          sessionId: null,
+          timelineId: null,
+        },
+        queryParamsHandling: 'merge',
+      });
     }
   }
 

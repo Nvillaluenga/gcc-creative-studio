@@ -13,44 +13,95 @@
 # limitations under the License.
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import ForeignKey, String, DateTime, func, Table, Column, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database import Base
 
-# # Association table for project resources (MediaItems)
-# project_media_items = Table(
-#     "project_media_items",
-#     Base.metadata,
-#     Column("project_id", ForeignKey("projects.id"), primary_key=True),
-#     Column("media_item_id", ForeignKey("media_items.id"), primary_key=True),
-# )
-#
-# # Association table for project resources (SourceAssets)
-# project_source_assets = Table(
-#     "project_source_assets",
-#     Base.metadata,
-#     Column("project_id", ForeignKey("projects.id"), primary_key=True),
-#     Column("source_asset_id", ForeignKey("source_assets.id"), primary_key=True),
-# )
+if TYPE_CHECKING:
+    from src.workspaces.schema.workspace_model import Workspace
+    from src.workbench.schema.timeline_model import Timeline
 
-# class Project(Base):
-#     __tablename__ = "projects"
-#
-#     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-#     name: Mapped[str] = mapped_column(String, nullable=False)
-#     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-#     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), nullable=False)
-#     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
-#     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
-#
-#     # Relationships
-#     storyboard: Mapped["Storyboard"] = relationship(back_populates="project", uselist=False, cascade="all, delete-orphan")
-#     canvas: Mapped["Canvas"] = relationship(back_populates="project", uselist=False, cascade="all, delete-orphan")
-#     timeline: Mapped["Timeline"] = relationship(back_populates="project", uselist=False, cascade="all, delete-orphan")
-#
-#     # Resources
-#     media_items: Mapped[list["MediaItem"]] = relationship(secondary=project_media_items)
-#     source_assets: Mapped[list["SourceAsset"]] = relationship(secondary=project_source_assets)
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id"), nullable=False
+    )
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    thumbnail_media_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media_items.id"), nullable=True
+    )
+    thumbnail_source_asset_id: Mapped[int | None] = mapped_column(
+        ForeignKey("source_assets.id"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    thumbnail_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    workspace: Mapped["Workspace"] = relationship(back_populates="projects")
+    storyboard: Mapped["Storyboard"] = relationship(
+        back_populates="project", uselist=False, cascade="all, delete-orphan"
+    )
+    timeline: Mapped["Timeline"] = relationship(
+        back_populates="project", uselist=False, cascade="all, delete-orphan"
+    )
+    sessions: Mapped[list["Session"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+
+    @property
+    def storyboard_id(self) -> int | None:
+        if hasattr(self, "_storyboard_id") and self._storyboard_id is not None:
+            return self._storyboard_id
+        try:
+            return self.storyboard.id if self.storyboard else None
+        except Exception:
+            return None
+
+    @storyboard_id.setter
+    def storyboard_id(self, value):
+        self._storyboard_id = value
+
+    @property
+    def timeline_id(self) -> int | None:
+        if hasattr(self, "_timeline_id") and self._timeline_id is not None:
+            return self._timeline_id
+        try:
+            return self.timeline.id if self.timeline else None
+        except Exception:
+            return None
+
+    @timeline_id.setter
+    def timeline_id(self, value):
+        self._timeline_id = value
+
+    @property
+    def session_id(self) -> str | None:
+        try:
+            if not self.sessions:
+                return None
+            # Sort by id descending to get the newest session
+            sorted_sessions = sorted(
+                self.sessions, key=lambda s: s.id, reverse=True
+            )
+            return sorted_sessions[0].session_id
+        except Exception:
+            return None
 
 
 class Storyboard(Base):
@@ -58,10 +109,6 @@ class Storyboard(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    workspace_id: Mapped[int] = mapped_column(
-        ForeignKey("workspaces.id"), nullable=False
-    )
-    session_id: Mapped[str | None] = mapped_column(String, nullable=True)
     template_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Background Music Prompt
@@ -72,7 +119,11 @@ class Storyboard(Base):
         ForeignKey("media_items.id"), nullable=True
     )
 
-    # project: Mapped["Project"] = relationship(back_populates="storyboard")
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id"), unique=True, nullable=False
+    )
+
+    project: Mapped["Project"] = relationship(back_populates="storyboard")
     scenes: Mapped[list["Scene"]] = relationship(
         back_populates="storyboard", cascade="all, delete-orphan"
     )
@@ -83,6 +134,19 @@ class Storyboard(Base):
     @property
     def timeline_id(self) -> int | None:
         return self.timeline.id if self.timeline else None
+
+    @property
+    def workspace_id(self) -> int | None:
+        if hasattr(self, "_workspace_id") and self._workspace_id is not None:
+            return self._workspace_id
+        try:
+            return self.project.workspace_id if self.project else None
+        except Exception:
+            return None
+
+    @workspace_id.setter
+    def workspace_id(self, value):
+        self._workspace_id = value
 
 
 class Scene(Base):
@@ -162,3 +226,16 @@ class Scene(Base):
 #     html_content: Mapped[str | None] = mapped_column(String, nullable=True)
 #
 #     project: Mapped["Project"] = relationship(back_populates="canvas")
+
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="sessions")

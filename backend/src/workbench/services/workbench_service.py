@@ -61,7 +61,7 @@ from src.workbench.dto.workbench_dto import (
     VideoClip,
     VideoTimeline,
 )
-from src.workbench.ffmpeg_service import FFmpegService
+from src.workbench.services.ffmpeg_service import FFmpegService
 from src.workbench.repository.timeline_repository import TimelineRepository
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,9 @@ def _process_timeline_in_background(
                     from src.workbench.repository.timeline_repository import (
                         TimelineRepository,
                     )
-                    from src.workbench.workbench_service import WorkbenchService
+                    from src.workbench.services.workbench_service import (
+                        WorkbenchService,
+                    )
                     from src.source_assets.repository.source_asset_repository import (
                         SourceAssetRepository,
                     )
@@ -150,6 +152,7 @@ def _process_timeline_in_background(
                             timeline
                         )
 
+                        thumbnail_path = None
                         try:
                             final_gcs_uri = await asyncio.to_thread(
                                 gcs_service.upload_file_to_gcs,
@@ -343,13 +346,12 @@ class WorkbenchService:
     async def delete_timeline(self, timeline_id: int) -> bool:
         return await self.timeline_repo.delete_timeline(timeline_id)
 
-    async def render_timeline_by_id(
-        self, timeline_id: int, user: UserModel, executor: ThreadPoolExecutor
+    async def render_timeline(
+        self,
+        timeline: TimelineResponse,
+        user: UserModel,
+        executor: ThreadPoolExecutor,
     ) -> MediaItemResponse | None:
-        timeline = await self.get_timeline(timeline_id)
-        if not timeline:
-            return None
-
         source_assets = []
         source_media_items = []
 
@@ -426,7 +428,7 @@ class WorkbenchService:
         )
 
         new_media_item = MediaItemModel(
-            prompt=f"Render of timeline {timeline_id}",
+            prompt=f"Render of timeline {timeline.timeline_id}",
             mime_type=MimeTypeEnum.VIDEO_MP4,
             status=JobStatusEnum.PROCESSING,
             user_id=user.id,
@@ -444,12 +446,12 @@ class WorkbenchService:
         executor.submit(
             _process_timeline_in_background,
             db_item.id,
-            timeline_id,
+            int(timeline.timeline_id),
         )
 
         return MediaItemResponse.model_validate(db_item)
 
-    async def render_timeline(
+    async def render_timeline_legacy(
         self, request: TimelineRequest
     ) -> tuple[str, str]:
         """Legacy render method for backwards compatibility."""

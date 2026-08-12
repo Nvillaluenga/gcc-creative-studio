@@ -34,8 +34,8 @@ from src.workbench.dto.workbench_dto import (
     VideoClip,
     VideoTimeline,
 )
-from src.workbench.ffmpeg_service import FFmpegService
-from src.workbench.workbench_service import WorkbenchService
+from src.workbench.services.ffmpeg_service import FFmpegService
+from src.workbench.services.workbench_service import WorkbenchService
 from src.common.schema.media_item_model import (
     MediaItemModel,
     MimeTypeEnum,
@@ -48,7 +48,7 @@ from src.common.schema.media_item_model import (
 @pytest.fixture(name="service")
 def fixture_service():
     with patch(
-        "src.workbench.workbench_service.storage.Client"
+        "src.workbench.services.workbench_service.storage.Client"
     ) as mock_storage_client:
         mock_gcs_service = AsyncMock()
         mock_timeline_repo = AsyncMock()
@@ -144,15 +144,7 @@ async def test_create_get_list_update_delete_timeline(service):
 
 
 @pytest.mark.anyio
-async def test_render_timeline_by_id_not_found(service):
-    service.get_timeline = AsyncMock(return_value=None)
-    mock_user = MagicMock()
-    res = await service.render_timeline_by_id(999, mock_user, None)
-    assert res is None
-
-
-@pytest.mark.anyio
-async def test_render_timeline_by_id_success(service):
+async def test_render_timeline_success(service):
     mock_timeline = VideoTimeline(
         timeline_id=1,
         workspace_id="1",
@@ -160,7 +152,6 @@ async def test_render_timeline_by_id_success(service):
         video_clips=[],
         audio_clips=[],
     )
-    service.get_timeline = AsyncMock(return_value=mock_timeline)
 
     mock_db_item = MediaItemModel(
         id=55,
@@ -185,7 +176,7 @@ async def test_render_timeline_by_id_success(service):
 
     mock_executor = MagicMock()
 
-    res = await service.render_timeline_by_id(1, mock_user, mock_executor)
+    res = await service.render_timeline(mock_timeline, mock_user, mock_executor)
 
     assert res is not None
     assert res.id == 55
@@ -262,7 +253,7 @@ async def test_stitch_timeline_full_flow(service):
                 ],
             }
             with patch(
-                "src.workbench.ffmpeg_service.subprocess.run"
+                "src.workbench.services.ffmpeg_service.subprocess.run"
             ) as mock_sub:
                 mock_sub.return_value = MagicMock(
                     returncode=0, stdout=b"", stderr=b""
@@ -286,8 +277,12 @@ async def test_render_timeline_success_video_only(service):
     )
     request = TimelineRequest(clips=[clip])
 
-    with patch("src.workbench.workbench_service.urllib.request.urlretrieve"):
-        with patch("src.workbench.ffmpeg_service.subprocess.run") as mock_run:
+    with patch(
+        "src.workbench.services.workbench_service.urllib.request.urlretrieve"
+    ):
+        with patch(
+            "src.workbench.services.ffmpeg_service.subprocess.run"
+        ) as mock_run:
             mock_process_ffprobe = MagicMock(
                 returncode=0, stdout=b'{"streams": [{"codec_type": "video"}]}'
             )
@@ -296,7 +291,9 @@ async def test_render_timeline_success_video_only(service):
             )
             mock_run.side_effect = [mock_process_ffprobe, mock_process_ffmpeg]
 
-            output_path, temp_dir = await service.render_timeline(request)
+            output_path, temp_dir = await service.render_timeline_legacy(
+                request
+            )
             assert output_path.endswith("output.mp4")
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
@@ -306,7 +303,7 @@ async def test_render_timeline_success_video_only(service):
 async def test_render_timeline_no_clips(service):
     request = TimelineRequest(clips=[])
     with pytest.raises(ValueError, match="No clips provided"):
-        await service.render_timeline(request)
+        await service.render_timeline_legacy(request)
 
 
 @pytest.mark.anyio
@@ -322,8 +319,12 @@ async def test_render_timeline_ffmpeg_failure(service):
     )
     request = TimelineRequest(clips=[clip])
 
-    with patch("src.workbench.workbench_service.urllib.request.urlretrieve"):
-        with patch("src.workbench.ffmpeg_service.subprocess.run") as mock_run:
+    with patch(
+        "src.workbench.services.workbench_service.urllib.request.urlretrieve"
+    ):
+        with patch(
+            "src.workbench.services.ffmpeg_service.subprocess.run"
+        ) as mock_run:
             mock_ffprobe = MagicMock(
                 returncode=0, stdout=b'{"streams": [{"codec_type": "video"}]}'
             )
@@ -333,4 +334,4 @@ async def test_render_timeline_ffmpeg_failure(service):
             mock_run.side_effect = [mock_ffprobe, mock_ffmpeg]
 
             with pytest.raises(RuntimeError, match="FFmpeg failed"):
-                await service.render_timeline(request)
+                await service.render_timeline_legacy(request)

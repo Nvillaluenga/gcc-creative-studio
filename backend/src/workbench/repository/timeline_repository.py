@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.common.base_repository import BaseRepository
 from src.database import get_db
 from src.workbench.schema.timeline_model import Timeline, VideoClip, AudioClip
+from src.workbench.schema.project_model import Project, Storyboard
 from src.workbench.dto.workbench_dto import (
     AssetRef,
     AudioClip as AudioClipDTO,
@@ -179,6 +180,7 @@ class TimelineRepository(BaseRepository[Timeline, TimelineResponse]):
         return VideoTimeline(
             timeline_id=db_timeline.id,
             storyboard_id=db_timeline.storyboard_id,
+            project_id=db_timeline.project_id,
             workspace_id=db_timeline.workspace_id
             or str(db_timeline.storyboard_id or 1),
             user_id=db_timeline.user_id,
@@ -319,6 +321,7 @@ class TimelineRepository(BaseRepository[Timeline, TimelineResponse]):
             .options(
                 selectinload(self.model.video_clips),
                 selectinload(self.model.audio_clips),
+                selectinload(self.model.project),
             )
         )
         result = await self.db.execute(query)
@@ -337,6 +340,7 @@ class TimelineRepository(BaseRepository[Timeline, TimelineResponse]):
             .options(
                 selectinload(self.model.video_clips),
                 selectinload(self.model.audio_clips),
+                selectinload(self.model.project),
             )
         )
         result = await self.db.execute(query)
@@ -353,8 +357,23 @@ class TimelineRepository(BaseRepository[Timeline, TimelineResponse]):
                 sb_id = int(timeline_create.storyboard_id)  # type: ignore
             except (ValueError, TypeError):
                 sb_id = None
+
+        # Resolve project_id
+        project_id = getattr(timeline_create, "project_id", None)
+        if sb_id and not project_id:
+            stmt = select(Storyboard).where(Storyboard.id == sb_id)
+            res = await self.db.execute(stmt)
+            storyboard = res.scalar_one_or_none()
+            if storyboard:
+                project_id = storyboard.project_id
+
+        if not project_id:
+            raise ValueError(
+                "project_id or a valid storyboard_id is required to create a new timeline"
+            )
         db_timeline = Timeline(
             storyboard_id=sb_id,
+            project_id=project_id,
             workspace_id=str(timeline_create.workspace_id),
             user_id=(
                 str(timeline_create.user_id)
@@ -408,6 +427,7 @@ class TimelineRepository(BaseRepository[Timeline, TimelineResponse]):
             .options(
                 selectinload(self.model.video_clips),
                 selectinload(self.model.audio_clips),
+                selectinload(self.model.project),
             )
         )
         result = await self.db.execute(query)

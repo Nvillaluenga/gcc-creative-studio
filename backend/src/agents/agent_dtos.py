@@ -15,8 +15,9 @@
 """Data Transfer Objects for Agent Controller Endpoints."""
 
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, Field
-from src.projects.dto.project_dto import StoryboardResponse
+from pydantic import BaseModel, Field, ConfigDict
+from pydantic.alias_generators import to_camel
+from src.workbench.dto.project_dto import StoryboardResponse
 
 
 # --- Sub-components for Chat ---
@@ -56,6 +57,7 @@ class ChatRequestDto(BaseModel):
 
     sessionId: str
     workspaceId: int
+    projectId: Optional[int] = None
     appName: Optional[str] = "ads_x"
     newMessage: Optional[ChatMessage] = None
     streaming: Optional[bool] = False
@@ -72,6 +74,12 @@ class PollEventsResponseDto(BaseModel):
     events: List[str]
 
 
+# --- Session Requests ---
+class SessionCreateRequestDto(BaseModel):
+    projectId: int
+    name: Optional[str] = None
+
+
 # --- Session Responses ---
 class SessionResponseDto(BaseModel):
     id: str
@@ -80,6 +88,7 @@ class SessionResponseDto(BaseModel):
     lastUpdateTime: Optional[float] = None
     state: Optional[Dict[str, Any]] = None
     events: Optional[List[Any]] = None
+    name: Optional[str] = None
 
 
 # --- Any dynamic structure fallback (for passthrough) ---
@@ -93,3 +102,19 @@ class ProxyResponseDto(BaseModel):
 class SessionDetailResponseDto(BaseModel):
     session: Optional[SessionResponseDto] = None
     storyboard: Optional[StoryboardResponse] = None
+
+
+class SessionUpdateDto(BaseModel):
+    name: Optional[str] = None
+
+
+class SessionDBResponse(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        alias_generator=to_camel,
+    )
+    id: int
+    project_id: int
+    session_id: str
+    name: Optional[str] = None

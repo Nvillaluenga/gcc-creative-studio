@@ -61,7 +61,9 @@ export class AuthGuardService implements CanActivate {
 
     // --- BROWSER SIDE ---
     if (!this.authService.isLoggedIn()) {
-      void this.router.navigate([LOGIN_ROUTE]);
+      void this.router.navigate([LOGIN_ROUTE], {
+        queryParams: {redirectUrl: state.url},
+      });
       return false;
     }
 

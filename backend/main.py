@@ -51,14 +51,21 @@ from src.source_assets.source_asset_controller import (
 from src.tags.tags_controller import router as tags_router
 from src.users.user_controller import router as user_router
 from src.videos.veo_controller import router as video_router
-from src.workbench.workbench_controller import router as workbench_router
+from src.workbench.controllers.workbench_controller import (
+    router as workbench_router,
+)
 from src.workflows.workflow_controller import router as workflow_router
 from src.workflows_executor.workflows_executor_controller import (
     router as workflows_executor_router,
 )
 from src.workspaces.workspace_controller import router as workspace_router
 from src.agents.agent_controller import router as agent_router
-from src.projects.project_controller import router as project_router
+from src.workbench.controllers.project_controller import (
+    router as project_router,
+)
+from src.workbench.controllers.storyboard_controller import (
+    router as storyboard_router,
+)
 
 
 def configure_cors(app):
@@ -185,3 +192,4 @@ app.include_router(workflows_executor_router)
 app.include_router(workbench_router)
 app.include_router(agent_router)
 app.include_router(project_router)
+app.include_router(storyboard_router)

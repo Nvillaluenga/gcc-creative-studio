@@ -35,6 +35,15 @@ export class AuthInterceptor implements HttpInterceptor {
     request: HttpRequest<unknown>,
     next: HttpHandler,
   ): Observable<HttpEvent<unknown>> {
+    const isBackendUrl =
+      request.url.startsWith('/') ||
+      (environment.backendURL.startsWith('http') &&
+        request.url.startsWith(environment.backendURL));
+    // Add validation for not intercepting the Google account url
+    if (!isBackendUrl) {
+      return next.handle(request);
+    }
+
     // Asynchronously get a valid token. This will use the cache or trigger a silent refresh.
     return this.authService.getValidIdentityPlatformToken$().pipe(
       switchMap(token => {
@@ -52,7 +61,9 @@ export class AuthInterceptor implements HttpInterceptor {
             'AuthInterceptor: Session expired and could not be refreshed. Logging out.',
             error,
           );
-          void this.authService.logout();
+          if (this.authService.isUserLoggedIn()) {
+            void this.authService.logout();
+          }
         }
 
         // Otherwise, it's a backend API error (e.g., 404, 500). We should NOT log out.

@@ -28,7 +28,7 @@ from src.workbench.dto.workbench_dto import (
     VideoClip,
     VideoTimeline,
 )
-from src.workbench.ffmpeg_service import FFmpegService
+from src.workbench.services.ffmpeg_service import FFmpegService
 
 
 @pytest.fixture(name="ffmpeg_service")
@@ -38,7 +38,9 @@ def fixture_ffmpeg_service():
 
 @pytest.mark.anyio
 async def test_get_media_info_success(ffmpeg_service):
-    with patch("src.workbench.ffmpeg_service.subprocess.run") as mock_sub:
+    with patch(
+        "src.workbench.services.ffmpeg_service.subprocess.run"
+    ) as mock_sub:
         mock_sub.return_value = MagicMock(
             returncode=0,
             stdout=b'{"streams": [{"codec_type": "video"}]}',
@@ -50,7 +52,9 @@ async def test_get_media_info_success(ffmpeg_service):
 
 @pytest.mark.anyio
 async def test_get_media_info_failure(ffmpeg_service):
-    with patch("src.workbench.ffmpeg_service.subprocess.run") as mock_sub:
+    with patch(
+        "src.workbench.services.ffmpeg_service.subprocess.run"
+    ) as mock_sub:
         mock_sub.return_value = MagicMock(
             returncode=1,
             stdout=b"",
@@ -90,7 +94,9 @@ async def test_stitch_timeline_flow(ffmpeg_service):
                 }
             ],
         }
-        with patch("src.workbench.ffmpeg_service.subprocess.run") as mock_sub:
+        with patch(
+            "src.workbench.services.ffmpeg_service.subprocess.run"
+        ) as mock_sub:
             mock_sub.return_value = MagicMock(
                 returncode=0, stdout=b"", stderr=b""
             )
@@ -138,7 +144,9 @@ async def test_stitch_timeline_wipe_left_transition(ffmpeg_service):
                 }
             ],
         }
-        with patch("src.workbench.ffmpeg_service.subprocess.run") as mock_sub:
+        with patch(
+            "src.workbench.services.ffmpeg_service.subprocess.run"
+        ) as mock_sub:
             mock_sub.return_value = MagicMock(
                 returncode=0, stdout=b"", stderr=b""
             )

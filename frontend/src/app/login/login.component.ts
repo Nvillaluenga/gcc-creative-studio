@@ -16,7 +16,7 @@
 
 import {Component, NgZone, Inject, PLATFORM_ID} from '@angular/core';
 import {GoogleAuthProvider} from '@angular/fire/auth';
-import {Router} from '@angular/router';
+import {ActivatedRoute, Router} from '@angular/router';
 import {AuthService} from './../common/services/auth.service';
 import {UserModel} from './../common/models/user.model';
 import {MatSnackBar} from '@angular/material/snack-bar';
@@ -46,6 +46,7 @@ export class LoginComponent {
   constructor(
     private authService: AuthService,
     private router: Router,
+    private route: ActivatedRoute,
     public ngZone: NgZone,
     private _snackBar: MatSnackBar,
     @Inject(PLATFORM_ID) platformId: Object,
@@ -71,7 +72,9 @@ export class LoginComponent {
           // in localStorage. We just need to redirect to trigger the AuthGuard.
           this.ngZone.run(() => {
             this.loader = false;
-            void this.router.navigate([HOME_ROUTE]);
+            const redirectUrl =
+              this.route.snapshot.queryParams['redirectUrl'] || HOME_ROUTE;
+            void this.router.navigateByUrl(redirectUrl);
           });
         },
         error: error => {
@@ -102,7 +105,9 @@ export class LoginComponent {
           // in localStorage. We just need to redirect to trigger the AuthGuard.
           this.ngZone.run(() => {
             this.loader = false;
-            void this.router.navigate([HOME_ROUTE]);
+            const redirectUrl =
+              this.route.snapshot.queryParams['redirectUrl'] || HOME_ROUTE;
+            void this.router.navigateByUrl(redirectUrl);
           });
         },
         error: error => {
@@ -141,6 +146,8 @@ export class LoginComponent {
       localStorage.setItem('USER_DETAILS', JSON.stringify(user));
     }
     this.loader = false;
-    void this.router.navigate([HOME_ROUTE]);
+    const redirectUrl =
+      this.route.snapshot.queryParams['redirectUrl'] || HOME_ROUTE;
+    void this.router.navigateByUrl(redirectUrl);
   }
 }
