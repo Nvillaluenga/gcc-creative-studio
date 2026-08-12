@@ -24,6 +24,13 @@ import {WorkspaceStateService} from '../../../services/workspace/workspace-state
 import {ProjectResponse} from '../../../common/models/workbench.model';
 import {ActivatedRoute} from '@angular/router';
 import {Subscription} from 'rxjs';
+import {MatDialog} from '@angular/material/dialog';
+import {ConfirmationDialogComponent} from '../../../common/components/confirmation-dialog/confirmation-dialog.component';
+import {MatSnackBar} from '@angular/material/snack-bar';
+import {
+  handleSuccessSnackbar,
+  handleErrorSnackbar,
+} from '../../../utils/handleMessageSnackbar';
 
 @Component({
   selector: 'app-project-switcher',
@@ -37,6 +44,8 @@ export class ProjectSwitcherComponent implements OnInit, OnDestroy {
   private projectStateService = inject(ProjectStateService);
   private workspaceStateService = inject(WorkspaceStateService);
   private route = inject(ActivatedRoute);
+  private dialog = inject(MatDialog);
+  private snackBar = inject(MatSnackBar);
   private subscriptions = new Subscription();
 
   projects: ProjectResponse[] = [];
@@ -209,5 +218,67 @@ export class ProjectSwitcherComponent implements OnInit, OnDestroy {
   private setActiveProject(project: ProjectResponse): void {
     this.selectedProjectId = project.id;
     this.projectStateService.setActiveProjectId(project.id);
+  }
+
+  deleteProjectFromDropdown(option: DropdownOption): void {
+    const projectId = option.value as number;
+    const project = this.projects.find(p => p.id === projectId);
+    let message = 'Are you sure you want to delete this project?';
+    if (project) {
+      const items: string[] = [];
+      if (project.session_id) {
+        items.push('chats');
+      }
+      if (project.storyboard_id) {
+        items.push('storyboard');
+      }
+      if (project.timeline_id) {
+        items.push('timeline');
+      }
+      if (items.length > 0) {
+        let itemsStr = '';
+        if (items.length === 1) {
+          itemsStr = items[0];
+        } else if (items.length === 2) {
+          itemsStr = `${items[0]} and ${items[1]}`;
+        } else {
+          itemsStr = `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+        }
+        message += ` This will permanently delete the associated ${itemsStr}.`;
+      }
+    }
+
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      data: {
+        title: 'Delete Project',
+        message: message,
+      },
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.projectService.deleteProject(projectId).subscribe({
+          next: () => {
+            this.projects = this.projects.filter(p => p.id !== projectId);
+            if (this.selectedProjectId === projectId) {
+              if (this.projects.length > 0) {
+                this.setActiveProject(this.projects[0]);
+              } else if (this.activeWorkspaceId) {
+                this.createDefaultProject(this.activeWorkspaceId);
+              } else {
+                this.selectedProjectId = null;
+                this.projectStateService.setActiveProjectId(null);
+              }
+            }
+            handleSuccessSnackbar(
+              this.snackBar,
+              'Project deleted successfully',
+            );
+          },
+          error: err => {
+            handleErrorSnackbar(this.snackBar, err, 'Delete Project');
+          },
+        });
+      }
+    });
   }
 }

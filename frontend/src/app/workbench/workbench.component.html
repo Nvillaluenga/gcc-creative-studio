@@ -706,6 +706,14 @@
               </div>
               <!-- <input type="range" [(ngModel)]="pixelsPerSecond" min="5" max="100" step="5"
                                                                                                                                                                     class="w-20 h-1 bg-gray-700 rounded-full appearance-none cursor-pointer accent-gray-400"> -->
+              <!-- Edit Clip Properties Button -->
+              <app-edit-clip
+                [disabled]="!selectedClip()"
+                [volume]="selectedClip()?.volume ?? 1.0"
+                [speed]="selectedClip()?.speed ?? 1.0"
+                [isAudio]="(selectedClip()?.trackIndex ?? 0) > 0"
+                (clipUpdated)="onClipUpdated($event)"
+              ></app-edit-clip>
               <!-- Split Button -->
               <studio-button variant="primary" size="small" shape="circle"
                 mat-button
@@ -835,39 +843,36 @@
                       "
                       (mousedown)="startDrag($event, clip)"
                       (click)="selectClip(clip.id, $event)"
-                      class="absolute top-1 bottom-1 rounded-xl cursor-pointer border flex items-center group transition-transform duration-200"
+                       class="absolute rounded-xl cursor-pointer border flex items-center group transition-all duration-200"
                       [ngClass]="{
                         'border-blue-500 ring-2 ring-blue-500/50 shadow-md shadow-blue-500/20 z-30':
                           timelineState.selectedClipId() === clip.id,
                         'border-white/10 bg-[#2a2a2c] hover:border-white/30':
                           timelineState.selectedClipId() !== clip.id,
                       }"
+                      [style.top]="
+                        timelineState.selectedClipId() === clip.id
+                          ? '-0.1rem'
+                          : '4px'
+                      "
+                      [style.bottom]="
+                        timelineState.selectedClipId() === clip.id
+                          ? '-0.1rem'
+                          : '4px'
+                      "
                       [style.left.px]="
                         getVisualClipLeft(clip)
                       "
-                      [style.width.px]="
-                        clip.duration * timelineState.pixelsPerSecond() - 4
+                      [style.width]="
+                        'calc(' + (clip.duration * timelineState.pixelsPerSecond() - 4) + 'px + ' + 
+                        (timelineState.selectedClipId() === clip.id ? '0.6rem' : '0px') + ')'
                       "
                       [style.transform]="
                         selectedClipIndex() === -1
                           ? 'none'
-                          : idx === selectedClipIndex()
-                            ? 'scale(1.1)'
-                            : idx === selectedClipIndex() - 1 ||
-                                idx === selectedClipIndex() + 1
-                              ? 'scale(0.95, 1)'
-                              : 'scale(1, 0.95)'
-                      "
-                      [style.transformOrigin]="
-                        selectedClipIndex() === -1
-                          ? 'center'
-                          : idx === selectedClipIndex()
-                            ? 'center'
-                            : idx === selectedClipIndex() - 1
-                              ? 'left'
-                              : idx === selectedClipIndex() + 1
-                                ? 'right'
-                                : 'center'
+                          : idx > selectedClipIndex()
+                            ? 'translateX(0.6rem)'
+                            : 'none'
                       "
                     >
                       <!-- Thumbnail Strip (when thumbnail available) -->
@@ -1012,3 +1017,5 @@
     </div>
   </div>
 </div>
+
+

@@ -51,7 +51,10 @@ import {GalleryService} from '../../../gallery/gallery.service';
 import {SourceAssetResponseDto} from '../../../common/services/source-asset.service';
 import {environment} from '../../../../environments/environment';
 import {MatSnackBar} from '@angular/material/snack-bar';
-import {handleErrorSnackbar} from '../../../utils/handleMessageSnackbar';
+import {
+  handleErrorSnackbar,
+  handleSuccessSnackbar,
+} from '../../../utils/handleMessageSnackbar';
 
 import {
   StoryboardResponse,
@@ -879,8 +882,11 @@ export class ChatInterfaceComponent
                   this.startNewChat();
                 }
               }
+              handleSuccessSnackbar(this.snackBar, 'Chat deleted successfully');
             },
-            error: err => console.error('Error deleting session:', err),
+            error: err => {
+              handleErrorSnackbar(this.snackBar, err, 'Delete Chat');
+            },
           });
       }
     });
@@ -909,9 +915,7 @@ export class ChatInterfaceComponent
             return sess;
           }),
         );
-        this.snackBar.open('Chat name updated successfully', 'Close', {
-          duration: 3000,
-        });
+        handleSuccessSnackbar(this.snackBar, 'Chat name updated successfully');
       },
       error: err => {
         console.error('Error updating session name:', err);

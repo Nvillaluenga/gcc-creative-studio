@@ -1,0 +1,65 @@
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
+<studio-button variant="primary" size="small" shape="circle"
+  mat-button
+  (click)="openModal()"
+  [disabled]="disabled"
+  title="Edit Clip Properties"
+>
+  <mat-icon class="!w-5 !h-5">edit</mat-icon>
+</studio-button>
+
+<!-- Clip Properties Modal/Dialog Template -->
+<ng-template #editClipPropertiesModal>
+  <div class="bg-[#18181b] border border-white/10 rounded-xl p-6 text-white max-w-sm">
+    <h4 class="!text-base !font-bold !mb-4 flex items-center gap-2">
+      <mat-icon class="!w-5 !h-5 flex items-center justify-center !mb-[0.2rem]">edit</mat-icon>
+      Edit Clip Properties
+    </h4>
+    <div class="space-y-3 mb-6 text-white/70">
+      <p class="text-sm">Configure speed and volume settings here.</p>
+      <div class="bg-black/20 rounded-lg p-4 text-xs space-y-4 font-mono">
+        <!-- Speed -->
+        <div class="space-y-1">
+          <div class="text-[10px] text-white/50 uppercase font-bold tracking-wider">Speed:</div>
+          <div class="flex items-center gap-3">
+            <studio-slider [min]="0.05" [max]="4" [step]="0.05" [(ngModel)]="editingClipSpeed"
+              class="flex-grow w-full"></studio-slider>
+            <input type="number" step="0.05" min="0.05" max="4" [(ngModel)]="editingClipSpeed"
+              class="bg-zinc-800 border border-white/10 rounded px-2 py-1 text-white w-14 outline-none focus:border-blue-500 font-mono text-xs no-spinners" />
+          </div>
+        </div>
+
+        <!-- Volume -->
+        <div *ngIf="isAudio" class="space-y-1 !mt-6">
+          <div class="text-[10px] text-white/50 uppercase font-bold tracking-wider">Volume:</div>
+          <div class="flex items-center gap-3">
+            <studio-slider [min]="0" [max]="1" [step]="0.05" [(ngModel)]="editingClipVolume"
+              class="flex-grow w-full"></studio-slider>
+            <input type="number" step="0.05" min="0" max="1" [(ngModel)]="editingClipVolume"
+              class="bg-zinc-800 border border-white/10 rounded px-2 py-1 text-white w-14 outline-none focus:border-blue-500 font-mono text-xs no-spinners" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3">
+      <button mat-button mat-dialog-close class="!text-white/60 !rounded-lg">Cancel</button>
+      <button mat-button mat-dialog-close [disabled]="isSaveDisabled" (click)="saveClipProperties()"
+        class="!text-blue-400 !rounded-lg">Save</button>
+    </div>
+  </div>
+</ng-template>

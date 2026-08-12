@@ -118,6 +118,7 @@ import {StoryboardComponent} from './workbench/components/storyboard/storyboard.
 import {TimeRulerComponent} from './workbench/components/time-ruler/time-ruler.component';
 import {TransitionIndicatorComponent} from './workbench/components/transition-indicator/transition-indicator.component';
 import {ProjectSwitcherComponent} from './workbench/components/project-switcher/project-switcher.component';
+import {EditClipComponent} from './workbench/components/edit-clip/edit-clip.component';
 
 @NgModule({
   declarations: [
@@ -200,6 +201,7 @@ import {ProjectSwitcherComponent} from './workbench/components/project-switcher/
     TimeRulerComponent,
     TransitionIndicatorComponent,
     ProjectSwitcherComponent,
+    EditClipComponent,
     TextFieldModule,
   ],
   providers: [

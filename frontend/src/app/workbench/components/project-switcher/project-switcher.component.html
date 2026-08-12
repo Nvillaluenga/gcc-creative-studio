@@ -20,6 +20,8 @@
     (valueChange)="selectProjectById($event)"
     [editable]="true"
     (optionEdited)="renameProject($event)"
+    [deletable]="true"
+    (optionDeleted)="deleteProjectFromDropdown($event)"
     [showAddOption]="true"
     addOptionLabel="Add project"
     (addOptionClicked)="createProject($event)"

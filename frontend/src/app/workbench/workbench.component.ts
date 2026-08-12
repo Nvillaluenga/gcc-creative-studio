@@ -29,6 +29,7 @@ import {
   OnInit,
   Inject,
   PLATFORM_ID,
+  TemplateRef,
 } from '@angular/core';
 import {isPlatformBrowser} from '@angular/common';
 import {HttpClient} from '@angular/common/http';
@@ -132,6 +133,12 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     const id = this.timelineState.selectedClipId();
     if (!id) return -1;
     return this.timelineState.videoClips().findIndex(c => c.id === id);
+  });
+
+  selectedClip = computed(() => {
+    const id = this.timelineState.selectedClipId();
+    if (!id) return null;
+    return this.timelineState.timelineClips().find(c => c.id === id) || null;
   });
 
   activeVideoSrc = computed(() => {
@@ -1392,6 +1399,30 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
     this.timelineState.selectedClipId.set(id);
   }
 
+  onClipUpdated(event: {volume: number; speed: number}) {
+    const id = this.timelineState.selectedClipId();
+    if (!id) return;
+    this.timelineState.timelineClips.update(prev =>
+      prev.map(c => {
+        if (c.id === id) {
+          const oldSpeed =
+            c.speed !== undefined && c.speed !== null ? c.speed : 1.0;
+          const newSpeed = event.speed || 1.0;
+          const newDuration = (c.duration * oldSpeed) / newSpeed;
+          return {
+            ...c,
+            volume: event.volume,
+            speed: newSpeed,
+            duration: newDuration,
+          };
+        }
+        return c;
+      }),
+    );
+    this.refreshTimelineLayout();
+    this.saveTimeline().subscribe();
+  }
+
   deleteSelectedClip() {
     const id = this.timelineState.selectedClipId();
     if (!id) return;
@@ -1979,17 +2010,20 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
           };
         }
 
+        const speed = c.speed !== undefined && c.speed !== null ? c.speed : 1.0;
+        const volume =
+          c.volume !== undefined && c.volume !== null ? c.volume : 1.0;
         return {
           asset_ref: assetRef,
           trim: {
             offset_seconds: c.offset,
-            duration_seconds: c.duration,
+            duration_seconds: c.duration * speed,
           },
           first_frame_asset_ref: c.first_frame_asset_ref || null,
           last_frame_asset_ref: c.last_frame_asset_ref || null,
           placeholder: c.placeholder || null,
-          volume: 1.0,
-          speed: 1.0,
+          volume: volume,
+          speed: speed,
         };
       });
 
@@ -2012,6 +2046,9 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
           };
         }
 
+        const speed = c.speed !== undefined && c.speed !== null ? c.speed : 1.0;
+        const volume =
+          c.volume !== undefined && c.volume !== null ? c.volume : 1.0;
         return {
           start_at: {
             video_clip_index: -1,
@@ -2020,9 +2057,10 @@ export class WorkbenchComponent implements OnInit, OnDestroy {
           asset_ref: assetRef,
           trim: {
             offset_seconds: c.offset,
-            duration_seconds: c.duration,
+            duration_seconds: c.duration * speed,
           },
-          volume: 1.0,
+          volume: volume,
+          speed: speed,
         };
       });
 
