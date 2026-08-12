@@ -622,6 +622,14 @@ class FFmpegService:
                     if eff_dur is not None:
                         eff_dur = eff_dur / audio_clip.speed
 
+                if audio_clip.volume is not None and audio_clip.volume != 1.0:
+                    vol_stream = f"[a{i}_vol]"
+                    chain.append(
+                        f"{current_stream}volume="
+                        f"{audio_clip.volume}{vol_stream}"
+                    )
+                    current_stream = vol_stream
+
                 if audio_clip.fade_in_duration_seconds > 0:
                     fadein_stream = f"[a{i}_fadein]"
                     chain.append(
